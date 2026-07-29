@@ -274,14 +274,21 @@ def load_model():
             model.load_state_dict(torch.load(MODEL_FILE, map_location=device)); model.eval()
     except Exception as e: print(f"Model load error: {e}"); tokenizer=None; model=None
 
-def auto_extract_imessage():
+def auto_extract_imessage(quiet=False):
     try:
         from extractors.imessage import is_available, extract
         if is_available():
             existing = _load_messages(); seen = set(m.get('text','') for m in existing)
             new = [m for m in extract() if m.get('text','') not in seen]
-            if new: _save_messages(existing+new); _rebuild_training_files(existing+new)
-    except: pass
+            if new:
+                _save_messages(existing+new); _rebuild_training_files(existing+new)
+                print(f"  📩  Got {len(new)} iMessages from Mac")
+            elif not quiet:
+                print(f"  📩  iMessage database found ({len(existing)} messages already loaded)")
+        else:
+            if not quiet: print(f"  ℹ️  No iMessage database found on this Mac")
+    except Exception as e:
+        if not quiet: print(f"  ⚠️  iMessage: {e}")
 
 def open_browser():
     try: webbrowser.open('http://127.0.0.1:8765')
@@ -289,12 +296,11 @@ def open_browser():
 
 def main():
     port = int(os.environ.get("PORT", 8765))
+    # Remove old single-use flag — always check for new iMessages
+    flag = os.path.join(HERE, ".auto_extracted")
+    if os.path.exists(flag): os.remove(flag)
     if sys.platform == "darwin":
-        flag = os.path.join(HERE, ".auto_extracted")
-        if not os.path.exists(flag):
-            auto_extract_imessage()
-            try: open(flag,'w').close()
-            except: pass
+        auto_extract_imessage()
     load_model()
     if not os.path.exists(MESSAGES_FILE): _save_messages([])
     import socket

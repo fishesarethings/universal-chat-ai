@@ -21,3 +21,4 @@ UPLOAD_*
 _upload_*
 installer/*.app/
 installer/*.zip
+.auto_extracted
