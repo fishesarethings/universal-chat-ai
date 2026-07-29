@@ -199,7 +199,7 @@ async function check() {
   } catch(e) {
     connected = false;
     icon.textContent = '🔌';
-    msg.innerHTML = 'The app needs to run on your computer first.<br><br><b>1. Download</b><br><a class="btn btn-primary" href="https://github.com/fishesarethings/universal-chat-ai/releases/latest/download/UniversalChatAI.app.zip" style="display:inline-block;padding:10px 20px;border-radius:8px;background:#00d4aa;color:#0a0a1a;text-decoration:none;font-weight:600;font-size:15px;margin:4px 0">⬇ Download for Mac</a><br><br><b>2. Open the downloaded file</b><br><br><b>3. Allow in macOS</b><br>Right-click → Open (first time only)<br><br><b>4. Click "Start" in the Terminal window</b><br><br><b>5. Tap Refresh below</b>';
+    msg.innerHTML = 'The app needs to run on your computer first.<br><br><b>1. Download</b><br><a class="btn btn-primary" href="https://github.com/fishesarethings/universal-chat-ai/releases/latest/download/UniversalChatAI.app.zip" style="display:inline-block;padding:10px 20px;border-radius:8px;background:#00d4aa;color:#0a0a1a;text-decoration:none;font-weight:600;font-size:15px;margin:4px 0">⬇ Download for Mac</a><br><br><b>2. Open the downloaded .zip</b> (it extracts to an app)<br><br><b>3. Right-click the app → Open</b> (only needed first time)<br><br><b>4. Click "Start" in the Terminal window</b><br><br><b>5. Tap Refresh below</b>';
     actions.innerHTML = '<button class="btn btn-primary" onclick="check()">🔄 Refresh</button><button class="btn btn-outline" onclick="document.getElementById(\'setup\').classList.add(\'hidden\');document.getElementById(\'bar\').style.display=\'none\'">Browse anyway</button>';
     document.getElementById('connStatus').textContent = '❌ Not connected';
   }

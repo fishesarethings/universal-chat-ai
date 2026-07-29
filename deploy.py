@@ -45,6 +45,10 @@ def build_frontend():
     for fname in os.listdir(WEB_SRC):
         shutil.copy2(os.path.join(WEB_SRC, fname), os.path.join(out, fname))
 
+    install_sh = os.path.join(HERE, "install.sh")
+    if os.path.exists(install_sh):
+        shutil.copy2(install_sh, os.path.join(out, "install.sh"))
+
     print(f"  Frontend: {out}/  ({len(os.listdir(out))} files)")
 
 
