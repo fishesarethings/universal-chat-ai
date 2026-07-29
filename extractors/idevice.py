@@ -6,13 +6,7 @@ Requires: brew install libimobiledevice
 Or on Linux: apt install libimobiledevice6
 """
 
-import os
-import sys
-import plistlib
-import shutil
-import sqlite3
-import subprocess
-import tempfile
+import os, sys, plistlib, shutil, sqlite3, subprocess, tempfile, pty, select, fcntl, re
 from datetime import datetime, timedelta
 
 name = "iPhone (USB)"
@@ -114,43 +108,115 @@ def create_backup(udid, output_dir, apps=None, progress_cb=None):
         pass
 
     if progress_cb: progress_cb(5, "Backing up messages...")
+
+    cmd = ["idevicebackup2", "backup", output_dir]
+    if udid: cmd.extend(["-u", udid])
+
+    master_fd, slave_fd = pty.openpty()
     try:
-        cmd = ["idevicebackup2", "backup", output_dir]
-        if udid:
-            cmd.extend(["-u", udid])
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        last_pct = 5
-        for line in proc.stdout or []:
-            line = line.strip()
-            if not line: continue
-            # Try to parse percentage from lines like "10.0%" or "Backing up: 50%"
-            import re
-            m = re.search(r'(\d+\.?\d*)\s*%', line)
-            if m:
-                pct = int(float(m.group(1)))
-                pct = max(5, min(95, pct))  # clamp between 5-95%
-                if pct > last_pct:
-                    last_pct = pct
-                    if progress_cb: progress_cb(pct, f"Backing up... {pct}%")
-            # Check for errors
-            low = line.lower()
-            if "error" in low and ("lock" in low or "screen" in low or "trust" in low or "passcode" in low):
-                if progress_cb: progress_cb(last_pct, "❌ " + line)
-        proc.wait(timeout=300)
-        manifest_path = os.path.join(output_dir, "Manifest.plist")
-        if os.path.exists(manifest_path):
-            if progress_cb: progress_cb(100, "Backup complete!")
-            with open(manifest_path, 'rb') as f:
-                manifest = plistlib.load(f)
-            return manifest
-        else:
-            if progress_cb: progress_cb(last_pct, "❌ Backup incomplete (no manifest)")
-            return None
-    except subprocess.TimeoutExpired:
-        if progress_cb: progress_cb(last_pct, "⏱️ Backup timed out (5 min). Keep phone unlocked and try again.")
-        return None
+        proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=slave_fd,
+                                stderr=slave_fd, close_fds=True, preexec_fn=os.setsid)
     except Exception as e:
-        if progress_cb: progress_cb(last_pct, f"❌ {e}")
+        os.close(master_fd); os.close(slave_fd)
+        if progress_cb: progress_cb(0, f"❌ Failed to start: {e}")
+        return None
+    os.close(slave_fd)
+
+    fl = fcntl.fcntl(master_fd, fcntl.F_GETFL)
+    fcntl.fcntl(master_fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
+
+    buf = b''
+    last_pct = 5
+    start_time = time.time()
+    last_output = start_time
+    first_output_timeout = 20  # wait up to 20s for first output
+    global_stuck_timeout = 120  # if no output for 2 minutes after startup, kill
+    last_status_msg = "Backing up messages..."
+    read_attempts_since_data = 0
+
+    def parse_and_report(text):
+        nonlocal last_pct, last_status_msg
+        m = re.search(r'(\d+\.?\d*)\s*%', text)
+        if m:
+            pct = int(float(m.group(1)))
+            pct = max(5, min(95, pct))
+            if pct > last_pct:
+                last_pct = pct
+                last_status_msg = f"Backing up... {pct}%"
+                if progress_cb: progress_cb(pct, last_status_msg)
+        # Check for error keywords
+        low = text.lower()
+        if "trust" in low and ("computer" in low or "this" in low):
+            if progress_cb: progress_cb(last_pct, "❌ Tap 'Trust' on your iPhone")
+            return "error"
+        if "password" in low and ("set" in low or "required" in low or "not" in low):
+            if progress_cb: progress_cb(last_pct, "❌ Go to Settings → General → Transfer or Reset → Reset Encrypted Backup Password")
+            return "error"
+        if "lock" in low or ("screen" in low and ("on" in low or "unlock" in low)):
+            if progress_cb: progress_cb(last_pct, "❌ Unlock your iPhone and keep screen on")
+            return "error"
+        if "denied" in low or "refused" in low or "failed" in low:
+            if progress_cb: progress_cb(last_pct, f"❌ {text.strip()}")
+            return "error"
+        return "ok"
+
+    while True:
+        r, w, e = select.select([master_fd], [], [], 1.0)
+        if r:
+            try:
+                data = os.read(master_fd, 4096)
+                if not data: break
+                last_output = time.time()
+                read_attempts_since_data = 0
+                buf += data
+                decoded = buf.decode('utf-8', errors='replace')
+                # Strip ANSI escape sequences
+                clean = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', decoded)
+                clean = re.sub(r'\x1b\].*?\x07', '', clean)
+                clean = re.sub(r'\r', '\n', clean)  # treat \r as newline
+                # Process any complete lines
+                for line in clean.split('\n'):
+                    line = line.strip()
+                    if line:
+                        status = parse_and_report(line)
+                        if status == "error":
+                            proc.kill()
+                            os.close(master_fd)
+                            return None
+            except OSError:
+                break
+        else:
+            read_attempts_since_data += 1
+            # Check if process has exited
+            ret = proc.poll()
+            if ret is not None:
+                break
+            # Timeouts
+            elapsed = time.time() - start_time
+            if elapsed > 300:  # 5 min overall
+                proc.kill()
+                if progress_cb: progress_cb(last_pct, "⏱️ Backup timed out (5 min)")
+                os.close(master_fd)
+                return None
+            # Stuck detection
+            stuck_time = elapsed - (last_output - start_time)
+            if elapsed > first_output_timeout and stuck_time > global_stuck_timeout:
+                if progress_cb: progress_cb(last_pct, "⏱️ Backup stuck — unplug/replug iPhone and try again")
+                proc.kill()
+                os.close(master_fd)
+                return None
+
+    proc.wait()
+    os.close(master_fd)
+
+    manifest_path = os.path.join(output_dir, "Manifest.plist")
+    if os.path.exists(manifest_path):
+        if progress_cb: progress_cb(100, "Backup complete!")
+        with open(manifest_path, 'rb') as f:
+            manifest = plistlib.load(f)
+        return manifest
+    else:
+        if progress_cb: progress_cb(last_pct, "❌ Backup incomplete (no manifest)")
         return None
 
 
