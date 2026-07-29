@@ -33,7 +33,7 @@ def main():
             z.extractall(tmp)
         os.chdir(tmp)
         print("Starting Universal Chat AI backend...")
-        print(f"Web UI: http://127.0.0.1:5050")
+        print(f"Web UI: http://127.0.0.1:8765")
         print("Press Ctrl+C to stop\n")
         subprocess.run([sys.executable, "-u", "server.py"])
     finally:

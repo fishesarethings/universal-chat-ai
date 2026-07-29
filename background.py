@@ -26,7 +26,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SERVER_SCRIPT = os.path.join(HERE, "server.py")
 LOG_FILE = os.path.join(HERE, "server.log")
 PID_FILE = os.path.join(HERE, "server.pid")
-PORT = int(os.environ.get("PORT", 5050))
+PORT = int(os.environ.get("PORT", 8765))
 
 PLIST_LABEL = "com.user.universalchat"
 PLIST_PATH = os.path.expanduser(f"~/Library/LaunchAgents/{PLIST_LABEL}.plist")

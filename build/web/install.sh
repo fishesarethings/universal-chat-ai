@@ -31,7 +31,7 @@ echo "  ✅  Starting..."
 cd "$DIR"
 python3 server.py &
 sleep 2
-open http://127.0.0.1:5050 2>/dev/null || xdg-open http://127.0.0.1:5050 2>/dev/null || echo "  Open http://127.0.0.1:5050"
+open http://127.0.0.1:8765 2>/dev/null || xdg-open http://127.0.0.1:8765 2>/dev/null || echo "  Open http://127.0.0.1:8765"
 echo ""
 echo "  Connect your iPhone/Android via USB"
 echo "  → Go to Train tab → Extract All Messages"
