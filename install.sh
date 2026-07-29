@@ -1,27 +1,76 @@
 #!/bin/bash
-# Universal Chat AI - One-line install for macOS
-# Run: bash <(curl -s https://fishesarethings.github.io/universal-chat-ai/install.sh)
+# Universal Chat AI - one command: installs everything, starts, opens browser
+DIR="$HOME/universal_chat_ai"
 
-set -e
-echo ""
-echo "  🧠  Universal Chat AI"
-echo "  ─────────────────────"
-echo "  📥  Downloading..."
+echo ""; echo "  🧠  Universal Chat AI"; echo "  ─────────────────────"
 
-cd /tmp
-curl -sL "https://github.com/fishesarethings/universal-chat-ai/releases/latest/download/UniversalChatAI.app.zip" -o UniversalChatAI.app.zip
-unzip -q -o UniversalChatAI.app.zip
-rm UniversalChatAI.app.zip
+if ! command -v python3 &>/dev/null; then echo "  ❌ Install Python 3: https://python.org"; exit 1; fi
 
-# Move to Applications
-if [ -d "/Applications/Universal Chat AI.app" ]; then
-    rm -rf "/Applications/Universal Chat AI.app"
+# Kill old server
+lsof -ti:8765 2>/dev/null | xargs kill 2>/dev/null || true
+
+# Download/update repo
+if [ ! -d "$DIR" ]; then
+  echo "  📥  Downloading..."
+  if command -v git &>/dev/null; then
+    git clone --depth=1 https://github.com/fishesarethings/universal-chat-ai.git "$DIR"
+  else
+    curl -sL "https://github.com/fishesarethings/universal-chat-ai/archive/refs/heads/master.zip" -o /tmp/repo.zip
+    unzip -q /tmp/repo.zip -d /tmp && rm /tmp/repo.zip
+    mv /tmp/universal-chat-ai-master "$DIR"
+  fi
+elif command -v git &>/dev/null; then
+  cd "$DIR" && git pull --ff-only 2>/dev/null || true
 fi
-mv "Universal Chat AI.app" /Applications/
 
-echo "  ✅  Installed to /Applications"
-echo "  🚀  Opening..."
-open "/Applications/Universal Chat AI.app"
+# Install phone tools (no sudo on Mac — brew installs to user-owned dirs)
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  if ! command -v brew &>/dev/null; then
+    echo "  ⚠️  Homebrew not found — install: https://brew.sh"
+    echo "      Then run this script again for automatic phone support."
+  else
+    if ! command -v idevice_id &>/dev/null; then
+      echo "  📲  Installing iPhone support (libimobiledevice)..."
+      brew install libimobiledevice || echo "  ⚠️  iPhone install failed — plug in + brew install libimobiledevice"
+    else
+      echo "  ✅  iPhone support ready"
+    fi
+    if ! command -v adb &>/dev/null; then
+      echo "  📲  Installing Android support (android-platform-tools)..."
+      brew install android-platform-tools || echo "  ⚠️  Android install failed — brew install android-platform-tools"
+    else
+      echo "  ✅  Android support ready"
+    fi
+  fi
+elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+  if command -v apt-get &>/dev/null; then
+    if ! command -v idevice_id &>/dev/null; then
+      echo "  📲  Installing iPhone support..."
+      sudo apt-get install -y libimobiledevice6 libimobiledevice-utils || echo "  ⚠️  Failed — try: sudo apt-get install libimobiledevice6"
+    fi
+    if ! command -v adb &>/dev/null; then
+      echo "  📲  Installing Android support..."
+      sudo apt-get install -y adb || echo "  ⚠️  Failed — try: sudo apt-get install adb"
+    fi
+  fi
+fi
+
+# Install Python deps
+echo "  📦  Installing flask..."
+python3 -m pip install flask flask-cors -q 2>/dev/null || echo "  📦  flask done"
+echo "  📦  Installing torch..."
+python3 -c "import torch" 2>/dev/null || python3 -m pip install torch -q 2>/dev/null || echo "  ⚠️  torch skipped — chat needs 'pip install torch'"
+
+clear 2>/dev/null || true
+echo ""; echo "  🧠  Universal Chat AI"; echo "  ─────────────────────"
+echo "  ✅  Starting..."
+cd "$DIR"
+python3 server.py &
+sleep 2
+open http://127.0.0.1:8765 2>/dev/null || xdg-open http://127.0.0.1:8765 2>/dev/null || echo "  Open http://127.0.0.1:8765"
 echo ""
-echo "  First time? Right-click the app → Open"
-echo ""
+echo "  📱  Plug in phone via USB (tap Trust on iPhone, USB Debugging on Android)"
+echo "      The site auto-detects every 3 seconds — no refresh needed."
+echo "  💬  Open http://127.0.0.1:8765 → Train tab → Extract → Train → Chat"
+echo "  ⏹   Quit: Ctrl+C in this Terminal"
+echo ""; wait

@@ -62,10 +62,11 @@ select,input{background:#1e1e3a;color:var(--text);border:1px solid #333;padding:
 <div id="train">
   <div class="card">
     <h3>1. Connect phone via USB</h3>
-    <div class="row"><span id="phoneStatus">🔍 Checking...</span></div>
+    <div class="row"><span>Tools</span><span id="toolStatus" style="font-size:12px">🔍 Checking...</span></div>
+    <div class="row"><span>Phone</span><span id="phoneStatus" style="font-size:12px">🔍 Checking...</span></div>
     <div id="phoneHelp" style="display:none;font-size:12px;color:var(--text2);margin:6px 0;line-height:1.6">
-      <b>iPhone:</b> Install <code style="font-size:11px">brew install libimobiledevice</code> then plug in and tap <b>Trust</b>.<br>
-      <b>Android:</b> Enable <b>USB Debugging</b> (Settings → Developer Options) then plug in.
+      <b>iPhone:</b> Plug in via USB → tap <b>Trust</b> on your phone.<br>
+      <b>Android:</b> Enable <b>USB Debugging</b> (Settings → Developer Options) → plug in.
     </div>
     <button class="btn btn-primary" id="extractBtn" onclick="extractPhone()" style="display:none;padding:14px">📲 Extract Messages</button>
     <div id="extractResult" style="font-size:13px;color:var(--text2);margin-top:6px"></div>
@@ -150,16 +151,23 @@ async function check() {
     if (s.messages) { document.getElementById('tMsgs').textContent = s.messages+' msgs'; document.getElementById('trainBtn').disabled = false; document.getElementById('trainCard').style.opacity = '1'; document.getElementById('tStatus').textContent = 'Ready!'; }
     if (s.train_running) { training = true; document.getElementById('trainBtn').textContent = '⏹ Stop'; setInterval(poll,1000); }
     if (s.model_loaded) document.getElementById('doneCard').style.display = 'block';
-    phoneDetected(s.phone_detected);
+    // tool status
+    const ts = document.getElementById('toolStatus');
+    const tools = s.tools||{}; const parts = [];
+    if (tools.libimobiledevice) parts.push('✅ iPhone'); else parts.push('❌ iPhone');
+    if (tools.adb) parts.push('✅ Android'); else parts.push('❌ Android');
+    ts.textContent = parts.join(' | ');
+    if (!tools.libimobiledevice && !tools.adb) ts.innerHTML = '❌ Need: <code style="font-size:10px;background:#1a1a2e;padding:2px 6px;border-radius:3px">brew install libimobiledevice android-platform-tools</code>';
+    phoneDetected(s.phone_detected, tools);
   } catch(e) { showSetup(); document.getElementById('connStatus').textContent = '❌ Not connected'; }
 }
 
-function phoneDetected(d) {
+function phoneDetected(d, t) {
   phoneInfo = null; const btn = document.getElementById('extractBtn'); const help = document.getElementById('phoneHelp');
-  let msg = '🔌 No phone detected';
+  let msg = '🔌 None';
   let found = false;
   if (d) for (const [s,info] of Object.entries(d)) {
-    if (info.devices&&info.devices.length) { phoneInfo = {source:s,udid:info.devices[0].udid}; msg = '📱 Phone found! '+info.devices[0].name; btn.style.display = 'block'; found = true; }
+    if (info.devices&&info.devices.length) { phoneInfo = {source:s,udid:info.devices[0].udid}; msg = '📱 '+info.devices[0].name+' ('+s+')'; btn.style.display = 'block'; found = true; }
   }
   document.getElementById('phoneStatus').textContent = msg;
   help.style.display = found ? 'none' : 'block';
