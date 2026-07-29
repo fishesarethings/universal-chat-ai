@@ -6,6 +6,9 @@ echo ""; echo "  🧠  Universal Chat AI"; echo "  ─────────�
 
 if ! command -v python3 &>/dev/null; then echo "  ❌ Install Python 3: https://python.org"; exit 1; fi
 
+# Kill any old server
+lsof -ti:8765 2>/dev/null | xargs kill 2>/dev/null || true
+
 # Download
 if [ ! -d "$DIR" ]; then
   echo "  📥  Downloading..."
@@ -20,10 +23,11 @@ elif command -v git &>/dev/null; then
   cd "$DIR" && git pull --ff-only 2>/dev/null || true
 fi
 
-# Install deps (ignore torch errors — it's big, may already be installed)
-echo "  📦  Installing dependencies..."
+# Install deps
+echo "  📦  Installing (1/2) flask..."
 python3 -m pip install flask flask-cors -q 2>/dev/null || true
-python3 -c "import torch" 2>/dev/null || python3 -m pip install torch -q 2>/dev/null || echo "  ⚠️  torch install skipped (AI will still work after manual install)"
+echo "  📦  Installing (2/2) torch..."
+python3 -c "import torch" 2>/dev/null || python3 -m pip install torch -q 2>/dev/null || echo "  ⚠️  torch skipped — AI needs 'pip install torch'"
 
 clear 2>/dev/null || true
 echo ""; echo "  🧠  Universal Chat AI"; echo "  ─────────────────────"
@@ -33,7 +37,7 @@ python3 server.py &
 sleep 2
 open http://127.0.0.1:8765 2>/dev/null || xdg-open http://127.0.0.1:8765 2>/dev/null || echo "  Open http://127.0.0.1:8765"
 echo ""
-echo "  Connect your iPhone/Android via USB"
-echo "  → Go to Train tab → Extract All Messages"
-echo "  → Train → Chat!"
+echo "  📱  Connect phone via USB"
+echo "  💬  Train tab → Extract → Train → Chat"
+echo "  ⏹   Quit: Ctrl+C in this Terminal window"
 echo ""; wait
