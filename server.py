@@ -282,13 +282,16 @@ def auto_extract_imessage(quiet=False):
             new = [m for m in extract() if m.get('text','') not in seen]
             if new:
                 _save_messages(existing+new); _rebuild_training_files(existing+new)
-                print(f"  📩  Got {len(new)} iMessages from Mac")
-            elif not quiet:
-                print(f"  📩  iMessage database found ({len(existing)} messages already loaded)")
+                print(f"  📩  Got {len(new)} iMessages from Mac ({(len(existing)+len(new))} total)")
+            else:
+                print(f"  📩  iMessage database found ({len(existing)} messages)")
         else:
             if not quiet: print(f"  ℹ️  No iMessage database found on this Mac")
     except Exception as e:
-        if not quiet: print(f"  ⚠️  iMessage: {e}")
+        import traceback
+        if not quiet:
+            print(f"  ⚠️  iMessage: {e}")
+            traceback.print_exc()
 
 def open_browser():
     try: webbrowser.open('http://127.0.0.1:8765')
