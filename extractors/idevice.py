@@ -6,7 +6,7 @@ Requires: brew install libimobiledevice
 Or on Linux: apt install libimobiledevice6
 """
 
-import os, sys, plistlib, shutil, sqlite3, subprocess, tempfile, pty, select, fcntl, re
+import os, sys, plistlib, shutil, sqlite3, subprocess, tempfile, pty, select, fcntl, re, time
 from datetime import datetime, timedelta
 
 name = "iPhone (USB)"
