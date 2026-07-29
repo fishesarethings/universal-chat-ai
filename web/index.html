@@ -125,6 +125,14 @@ select,input{background:#1e1e3a;color:var(--text);border:1px solid #333;padding:
 const BACKEND = 'http://127.0.0.1:5050';
 let connected = false, training = false, phoneInfo = null;
 
+function copyCmd(el) {
+  const txt = document.getElementById('cmdText').textContent;
+  navigator.clipboard.writeText(txt);
+  const badge = document.getElementById('copyBadge');
+  badge.textContent = '✅ copied!';
+  setTimeout(() => badge.textContent = '📋 copy', 2000);
+}
+
 async function api(m, p, b) {
   const r = await fetch(BACKEND + p, {method:m,headers:b?{'Content-Type':'application/json'}:undefined,body:b?JSON.stringify(b):undefined});
   const d = await r.json(); if (d.error) throw new Error(d.error); return d;
@@ -178,10 +186,10 @@ function showDownloadInstructions(os) {
     <p style="font-size:12px;color:var(--text2);margin-bottom:6px">${phoneNote}</p>
 
     <div style="background:#1a1a2e;border:1px solid var(--primary);border-radius:8px;padding:14px;margin-bottom:12px;text-align:left">
-      <div style="font-weight:600;margin-bottom:6px;color:var(--primary)">✅ One command — paste in Terminal</div>
-      <code style="font-size:11px;display:block;padding:8px;background:#0a0a1a;border-radius:4px;word-break:break-all"
-        onclick="navigator.clipboard.writeText(this.textContent);this.style.border='1px solid var(--primary)'">bash <(curl -s https://fishesarethings.github.io/universal-chat-ai/install.sh)</code>
-      <div style="font-size:10px;color:var(--text2);margin-top:4px">Click to copy. Paste, press Enter. Downloads everything and launches.</div>
+      <div style="font-weight:600;margin-bottom:6px;color:var(--primary)">✅ One command — copy and paste into Terminal</div>
+      <div style="font-size:11px;display:block;padding:10px;background:#0a0a1a;border-radius:4px;word-break:break-all;cursor:pointer;border:1px solid #333"
+        onclick="copyCmd(this)"><span id="cmdText">bash <(curl -s https://raw.githubusercontent.com/fishesarethings/universal-chat-ai/master/build/web/install.sh)</span> <span id="copyBadge" style="float:right;font-size:10px;color:var(--primary)">📋 copy</span></div>
+      <div style="font-size:10px;color:var(--text2);margin-top:4px">Click the box → paste into Terminal → press Enter. Done.</div>
     </div>
 
     <details style="text-align:left;font-size:12px;color:var(--text2);margin-bottom:12px">
