@@ -92,7 +92,7 @@ def get_available_apps(udid):
     return apps
 
 
-def create_backup(udid, output_dir, apps=None, progress_cb=None):
+def create_backup(udid, output_dir, apps=None, progress_cb=None, backup_password=None):
     if progress_cb: progress_cb(0, "Starting backup...")
     print(f"  Creating iPhone backup (this may take a few minutes)...")
     print(f"  Keep your iPhone unlocked and screen on.")
@@ -119,7 +119,9 @@ def create_backup(udid, output_dir, apps=None, progress_cb=None):
     try:
         diag_cmd = ["idevicebackup2", "backup", diag_dir]
         if udid: diag_cmd.extend(["-u", udid])
-        quick_check = subprocess.run(diag_cmd, capture_output=True, text=True, timeout=10, input="")
+        diag_env = os.environ.copy()
+        if backup_password: diag_env["BACKUP_PASSWORD"] = backup_password
+        quick_check = subprocess.run(diag_cmd, capture_output=True, text=True, timeout=10, input="", env=diag_env)
         if quick_check.returncode != 0:
             err = (quick_check.stderr or quick_check.stdout or "").strip()[:300]
             low = err.lower()
@@ -146,7 +148,8 @@ def create_backup(udid, output_dir, apps=None, progress_cb=None):
 
     # Set backup password env var in case device prompts
     env = os.environ.copy()
-    env["BACKUP_PASSWORD"] = ""
+    if backup_password:
+        env["BACKUP_PASSWORD"] = backup_password
 
     master_fd, slave_fd = pty.openpty()
     try:
@@ -530,7 +533,7 @@ def _generic_scan(db_path):
     return messages
 
 
-def extract(udid=None, selected_apps=None, max_messages=None, progress_cb=None):
+def extract(udid=None, selected_apps=None, max_messages=None, progress_cb=None, backup_password=None):
     if not is_installed():
         install_cmd = "brew install libimobiledevice" if sys.platform == "darwin" else "apt install libimobiledevice6"
         raise RuntimeError(f"libimobiledevice not found. Install: {install_cmd}")
@@ -551,7 +554,7 @@ def extract(udid=None, selected_apps=None, max_messages=None, progress_cb=None):
     backup_dir = tempfile.mkdtemp(prefix="iphone_backup_")
     all_messages = []
     try:
-        manifest = create_backup(udid, backup_dir, progress_cb=progress_cb)
+        manifest = create_backup(udid, backup_dir, progress_cb=progress_cb, backup_password=backup_password)
         if manifest is None:
             raise RuntimeError("Backup failed — unlock phone, tap Trust, then try again")
 
