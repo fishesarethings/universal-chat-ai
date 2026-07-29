@@ -63,6 +63,10 @@ select,input{background:#1e1e3a;color:var(--text);border:1px solid #333;padding:
   <div class="card">
     <h3>1. Connect phone via USB</h3>
     <div class="row"><span id="phoneStatus">🔍 Checking...</span></div>
+    <div id="phoneHelp" style="display:none;font-size:12px;color:var(--text2);margin:6px 0;line-height:1.6">
+      <b>iPhone:</b> Install <code style="font-size:11px">brew install libimobiledevice</code> then plug in and tap <b>Trust</b>.<br>
+      <b>Android:</b> Enable <b>USB Debugging</b> (Settings → Developer Options) then plug in.
+    </div>
     <button class="btn btn-primary" id="extractBtn" onclick="extractPhone()" style="display:none;padding:14px">📲 Extract Messages</button>
     <div id="extractResult" style="font-size:13px;color:var(--text2);margin-top:6px"></div>
   </div>
@@ -151,12 +155,14 @@ async function check() {
 }
 
 function phoneDetected(d) {
-  phoneInfo = null; const btn = document.getElementById('extractBtn');
-  let msg = '🔌 No phone';
+  phoneInfo = null; const btn = document.getElementById('extractBtn'); const help = document.getElementById('phoneHelp');
+  let msg = '🔌 No phone detected';
+  let found = false;
   if (d) for (const [s,info] of Object.entries(d)) {
-    if (info.devices&&info.devices.length) { phoneInfo = {source:s,udid:info.devices[0].udid}; msg = '📱 Phone found!'; btn.style.display = 'block'; }
+    if (info.devices&&info.devices.length) { phoneInfo = {source:s,udid:info.devices[0].udid}; msg = '📱 Phone found! '+info.devices[0].name; btn.style.display = 'block'; found = true; }
   }
   document.getElementById('phoneStatus').textContent = msg;
+  help.style.display = found ? 'none' : 'block';
 }
 
 async function extractPhone() {
@@ -220,6 +226,7 @@ function switchTab(n) { document.querySelectorAll('.tab').forEach(t=>t.classList
 document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>switchTab(t.dataset.tab)));
 
 check();
+setInterval(()=>{if(!document.getElementById('setup').classList.contains('hidden'))return;if(!phoneInfo)check();},3000);
 </script>
 </body>
 </html>
