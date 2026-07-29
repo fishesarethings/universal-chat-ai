@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<meta name="apple-mobile-web-app-capable" content="yes">
 <title>Chat AI</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -16,12 +15,14 @@ body{font-family:-apple-system,system-ui,sans-serif;background:var(--bg);color:v
 #setup .icon{font-size:48px;margin-bottom:8px}
 #setup h1{font-size:22px;font-weight:700;margin-bottom:4px}
 #setup p{color:var(--text2);font-size:14px;margin-bottom:20px;max-width:340px;line-height:1.5}
-#setup .box{background:var(--surface);border-radius:var(--radius);padding:24px;max-width:360px;width:100%}
+#setup .box{background:var(--surface);border-radius:var(--radius);padding:24px;max-width:400px;width:100%}
 .btn{display:block;width:100%;padding:14px;border-radius:10px;border:none;font-size:16px;font-weight:600;cursor:pointer;text-align:center;margin-bottom:8px}
 .btn-primary{background:var(--primary);color:#0a0a1a}
 .btn-outline{background:transparent;border:1px solid #333;color:var(--text)}
 .btn:disabled{opacity:.4;cursor:default}
 #setup code{display:block;background:#1a1a2e;padding:10px 14px;border-radius:8px;font-size:12px;color:var(--primary);margin:8px 0;text-align:left;line-height:1.8}
+.step{display:flex;align-items:center;gap:12px;text-align:left;padding:8px 0;font-size:13px;color:var(--text2)}
+.step .num{width:24px;height:24px;border-radius:12px;background:var(--primary);color:#0a0a1a;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0}
 
 /* Tabs */
 .tabs{display:flex;background:var(--surface);flex-shrink:0}
@@ -63,11 +64,9 @@ select,input{background:#1e1e3a;color:var(--text);border:1px solid #333;padding:
 <div id="setup">
   <div class="icon" id="sIcon">🧠</div>
   <h1>Chat AI</h1>
-  <p>AI trained on your messages. Runs on your computer. Nothing leaves your device.</p>
-  <div class="box">
-    <div class="icon" id="sBig">🔍</div>
-    <p id="sMsg">Looking for the server on your computer...</p>
-    <div id="sActions"></div>
+  <p>An AI trained on ALL your messages. Plug in your phone and go.</p>
+  <div class="box" id="sBox">
+    <div id="sContent"></div>
   </div>
 </div>
 
@@ -80,7 +79,7 @@ select,input{background:#1e1e3a;color:var(--text);border:1px solid #333;padding:
 
 <!-- Chat -->
 <div id="chat">
-  <div class="msgs" id="msgs"><div class="msg info">Plug in a phone, go to Train tab, and tap Extract.</div></div>
+  <div class="msgs" id="msgs"><div class="msg info">Plug in a phone, go to Train, tap Extract.</div></div>
   <div class="bar">
     <input id="input" placeholder="Type a message..." autocomplete="off">
     <button id="sendBtn" onclick="send()">Send</button>
@@ -93,7 +92,7 @@ select,input{background:#1e1e3a;color:var(--text);border:1px solid #333;padding:
     <h3>Phone</h3>
     <div class="row"><span>Status</span><span class="val" id="phoneStatus">Detecting...</span></div>
     <div id="phoneApps" style="display:none;margin-top:8px"></div>
-    <button class="btn btn-primary" id="extractBtn" onclick="extractPhone()" style="display:none">📲 Extract from Phone</button>
+    <button class="btn btn-primary" id="extractBtn" onclick="extractPhone()" style="display:none">📲 Extract All Messages</button>
     <div id="extractResult" style="font-size:13px;color:var(--text2);margin-top:8px"></div>
   </div>
   <div class="card">
@@ -122,8 +121,8 @@ select,input{background:#1e1e3a;color:var(--text);border:1px solid #333;padding:
   <input type="file" id="importFile" accept=".zip" style="display:none" onchange="importModel(this.files[0])">
   <div id="importResult" style="font-size:13px;color:var(--text2);margin-top:8px;display:none"></div>
   <div class="card" style="margin-top:8px">
-    <h3>Or import from computer</h3>
-    <p style="font-size:13px;color:var(--text2);margin-bottom:8px">Upload chat exports from other apps.</p>
+    <h3>Import from file</h3>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:8px">Upload chat exports from your computer.</p>
     <button class="btn btn-outline" onclick="document.getElementById('fileInput').click()" style="font-size:13px">📁 Choose File</button>
     <input type="file" id="fileInput" accept=".json,.txt,.csv,.zip" style="display:none">
     <div id="fileResult" style="font-size:13px;color:var(--text2);margin-top:8px"></div>
@@ -160,13 +159,34 @@ async function api(m, p, b) {
 }
 
 // Setup
+function showSetup() {
+  const c = document.getElementById('sContent');
+  c.innerHTML = `
+    <div class="icon" style="font-size:36px;margin-bottom:8px">📱</div>
+    <p style="font-size:13px;margin-bottom:16px">Run the app on your Mac, then plug in your phone.</p>
+    <div class="step"><div class="num">1</div> Download the app from GitHub → open it</div>
+    <div class="step"><div class="num">2</div> Plug in your iPhone or Android via USB</div>
+    <div class="step"><div class="num">3</div> Tap Extract, Train, then Chat!</div>
+    <div style="margin-top:16px">
+      <a class="btn btn-primary" href="https://github.com/fishesarethings/universal-chat-ai/releases">⬇ Download App</a>
+      <p style="font-size:11px;color:var(--text2);margin:4px 0">Or run from Terminal:</p>
+      <code style="font-size:11px">bash <(curl -s https://fishesarethings.github.io/universal-chat-ai/install.sh)</code>
+      <button class="btn btn-outline" onclick="check()" style="margin-top:12px">🔄 I'm running it — Refresh</button>
+    </div>
+  `;
+}
+
 async function check() {
   try {
     const s = await api('GET','/api/status');
     connected = true;
-    document.getElementById('sIcon').textContent = '✅';
-    document.getElementById('sMsg').textContent = `Connected! ${s.messages} messages.`;
-    document.getElementById('setup').classList.add('hidden');
+    document.getElementById('sContent').innerHTML = `
+      <div class="icon" style="font-size:36px;margin-bottom:8px">✅</div>
+      <p style="font-size:14px;color:var(--text);margin-bottom:4px">Connected!</p>
+      <p style="font-size:13px;color:var(--text2)">${s.messages} messages loaded.</p>
+      <div style="margin-top:12px">${s.phone_detected ? '<p style="font-size:13px;color:var(--primary)">📱 Phone detected — go to Train tab!</p>' : '<p style="font-size:13px;color:var(--text2)">Plug in a phone, then go to Train tab.</p>'}</div>
+      <button class="btn btn-primary" onclick="document.getElementById('setup').classList.add('hidden')" style="margin-top:12px">💬 Start Chatting</button>
+    `;
     document.getElementById('connStatus').textContent = '✅ Connected';
     document.getElementById('tMsgs').textContent = s.messages;
     document.getElementById('msgCount').textContent = s.messages;
@@ -174,9 +194,7 @@ async function check() {
     if (s.phone_detected) phoneDetected(s.phone_detected);
     if (s.train_running) { training = true; document.getElementById('trainBtn').textContent = '⏹ Stop'; setInterval(poll, 1000); }
   } catch(e) {
-    document.getElementById('sBig').textContent = '🔌';
-    document.getElementById('sMsg').innerHTML = 'Run the app on your computer first.<br><br><b>1.</b> Open Terminal<br><b>2.</b> <code>cd ~/universal_chat_ai<br>python3 server.py</code><br><b>3.</b> Tap Refresh';
-    document.getElementById('sActions').innerHTML = '<button class="btn btn-primary" onclick="check()">🔄 Refresh</button>';
+    showSetup();
     document.getElementById('connStatus').textContent = '❌ Not connected';
   }
 }
@@ -192,8 +210,7 @@ async function send() {
   try {
     const r = await api('POST','/api/generate',{
       prompt:text, temperature:parseFloat(document.getElementById('temp').value),
-      max_new:parseInt(document.getElementById('maxlen').value),
-      history: []
+      max_new:parseInt(document.getElementById('maxlen').value), history: []
     });
     addMsg('assistant', r.text);
   } catch(e) { addMsg('assistant', '[error]'); }
@@ -205,28 +222,24 @@ function addMsg(role, text) {
   const el = document.getElementById('msgs');
   const div = document.createElement('div');
   div.className = 'msg ' + (role==='user'?'me':'ai');
-  div.textContent = text;
-  el.appendChild(div);
+  div.textContent = text; el.appendChild(div);
   el.scrollTop = el.scrollHeight;
 }
 
 // Phone auto-detect
-async function phoneDetected(data) {
-  phoneInfo = null;
-  let html = '';
+function phoneDetected(data) {
+  phoneInfo = null; let html = '';
   for (const [source, info] of Object.entries(data)) {
     if (info.devices && info.devices.length > 0) {
       const dev = info.devices[0];
       phoneInfo = { source, udid: dev.udid };
       html += `<div style="font-size:13px;margin:4px 0">✅ ${source}: ${dev.name}</div>`;
       if (info.available_apps && info.available_apps.length > 0) {
-        html += '<div style="font-size:12px;color:var(--text2);margin:4px 0">Apps:</div>';
+        html += '<div style="font-size:12px;color:var(--text2);margin:6px 0">All messaging apps will be scanned:</div><div style="font-size:12px;display:flex;flex-wrap:wrap;gap:4px">';
         for (const app of info.available_apps) {
-          const disabled = !app.available ? 'disabled' : '';
-          html += `<label style="display:flex;align-items:center;gap:6px;font-size:13px;margin:2px 0;opacity:${app.available?'1':'.4'}">
-            <input type="checkbox" value="${app.name}" ${app.available?'checked':'disabled'} style="width:16px;height:16px;accent-color:var(--primary)">
-            ${app.name}</label>`;
+          html += `<span style="background:#1e1e3a;padding:2px 8px;border-radius:4px;${app.available?'':'opacity:.4'}">${app.name}</span>`;
         }
+        html += '</div>';
         document.getElementById('extractBtn').style.display = 'block';
       }
     } else if (info.error) {
@@ -242,13 +255,11 @@ async function phoneDetected(data) {
 
 async function extractPhone() {
   if (!phoneInfo) return;
-  const checks = document.querySelectorAll('#phoneApps input:checked');
-  const apps = Array.from(checks).map(c => c.value);
   document.getElementById('extractBtn').disabled = true;
-  document.getElementById('extractResult').textContent = '⏳ Extracting...';
+  document.getElementById('extractResult').textContent = '⏳ Extracting all messages...';
   try {
     const r = await api('POST','/api/extract', {
-      source: phoneInfo.source, udid: phoneInfo.udid, apps: apps, sync: true
+      source: phoneInfo.source, udid: phoneInfo.udid, sync: true
     });
     document.getElementById('extractResult').innerHTML = `✅ Got ${r.new} new messages! Total: ${r.total}`;
     document.getElementById('tMsgs').textContent = r.total;
@@ -292,7 +303,6 @@ async function exportModel() {
     const a = document.createElement('a'); a.href = url; a.download = 'chat-ai-model.zip'; a.click();
   } catch(e) { alert('Export error: '+e.message); }
 }
-
 async function importModel(file) {
   const fd = new FormData(); fd.append('file', file);
   const el = document.getElementById('importResult'); el.style.display='block';
@@ -303,7 +313,6 @@ async function importModel(file) {
     el.innerHTML = d.ok ? '✅ Model imported!' : '❌ '+d.error;
   } catch(e) { el.textContent = '❌ '+e.message; }
 }
-
 // File import
 document.getElementById('fileInput').addEventListener('change', async function() {
   if (!this.files[0]) return;
@@ -328,7 +337,6 @@ document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
   }).catch(()=>{}); }
 }));
 
-// Start
 check();
 </script>
 </body>

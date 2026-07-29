@@ -37,6 +37,15 @@ EXTRACTABLE_FROM_BACKUP = {
     'WhatsApp': {'enabled': True, 'file': 'ChatStorage.sqlite', 'parser': 'whatsapp'},
     'Signal': {'enabled': True, 'file': 'Signal.sqlite', 'parser': 'signal'},
     'Telegram': {'enabled': True, 'file': 'telegram.sqlite', 'parser': 'telegram'},
+    'Facebook Messenger': {'enabled': True, 'file': 'com.facebook.Messenger', 'parser': 'generic'},
+    'Snapchat': {'enabled': True, 'file': 'com.toyopagroup.picaboo', 'parser': 'generic'},
+    'Instagram': {'enabled': True, 'file': 'com.burbn.instagram', 'parser': 'generic'},
+    'WeChat': {'enabled': True, 'file': 'com.tencent.xin', 'parser': 'generic'},
+    'Viber': {'enabled': True, 'file': 'com.viber', 'parser': 'generic'},
+    'GroupMe': {'enabled': True, 'file': 'com.groupme', 'parser': 'generic'},
+    'Kik': {'enabled': True, 'file': 'com.kik', 'parser': 'generic'},
+    'Line': {'enabled': True, 'file': 'com.linecorp.Line', 'parser': 'generic'},
+    'Skype': {'enabled': True, 'file': 'com.skype', 'parser': 'generic'},
 }
 
 
@@ -145,6 +154,9 @@ def extract_from_backup(backup_dir, app_name):
 
     if app_name == 'Telegram':
         return _search_backup_for(backup_dir, db_file, _parse_telegram_db)
+
+    if config['parser'] == 'generic':
+        return _search_backup_for(backup_dir, db_file, _generic_scan)
 
     return []
 
@@ -308,6 +320,55 @@ def _parse_telegram_db(db_path):
                 })
         except:
             pass
+        conn.close()
+    except:
+        pass
+    return messages
+
+
+def _generic_scan(db_path):
+    """Scan ANY SQLite database for message-like data."""
+    messages = []
+    try:
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+        cur = conn.cursor()
+        tables = [r[0] for r in cur.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+        for table in tables:
+            try:
+                cols = [r[1] for r in cur.execute(f"PRAGMA table_info(\"{table}\")").fetchall()]
+            except:
+                continue
+            text_cols = [c for c in cols if c.lower() in ('text','message','body','content','data','caption','comment')]
+            if not text_cols:
+                text_cols = [c for c in cols if any(t in c.lower() for t in ('text','message','body','content','caption'))]
+            ts_cols = [c for c in cols if any(t in c.lower() for t in ('date','time','timestamp','sent','created'))]
+            if not text_cols:
+                continue
+            try:
+                sel = ','.join(text_cols + ts_cols[:1])
+                order = ts_cols[0] if ts_cols else '1'
+                query = f"SELECT {sel} FROM \"{table}\" ORDER BY {order} ASC"
+                rows = cur.execute(query).fetchall()
+                for row in rows:
+                    text = str(row[0]) if row[0] is not None else ''
+                    if not text.strip() or text == 'None':
+                        continue
+                    ts = None
+                    if len(row) > 1 and row[1]:
+                        try:
+                            ts = datetime.fromtimestamp(float(str(row[1])) / 1000).isoformat()
+                        except:
+                            try:
+                                ts = datetime.fromtimestamp(float(str(row[1]))).isoformat()
+                            except:
+                                pass
+                    messages.append({
+                        "role": "user", "text": text.strip(),
+                        "timestamp": ts, "sender": None,
+                        "service": os.path.basename(db_path).replace('.sqlite','').replace('.db',''),
+                    })
+            except:
+                continue
         conn.close()
     except:
         pass

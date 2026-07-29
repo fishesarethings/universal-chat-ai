@@ -56,6 +56,66 @@ ANDROID_APPS = {
         'backup_cmd': 'com.discord',
         'parser': 'discord',
     },
+    'Facebook Messenger': {
+        'root_only': True,
+        'db': '/data/data/com.facebook.orca/databases/',
+        'backup_cmd': 'com.facebook.orca',
+        'parser': 'generic',
+    },
+    'Snapchat': {
+        'root_only': True,
+        'db': '/data/data/com.snapchat.android/databases/',
+        'backup_cmd': 'com.snapchat.android',
+        'parser': 'generic',
+    },
+    'Instagram': {
+        'root_only': True,
+        'db': '/data/data/com.instagram.android/databases/',
+        'backup_cmd': 'com.instagram.android',
+        'parser': 'generic',
+    },
+    'WeChat': {
+        'root_only': True,
+        'db': '/data/data/com.tencent.mm/databases/',
+        'backup_cmd': 'com.tencent.mm',
+        'parser': 'generic',
+    },
+    'Viber': {
+        'root_only': True,
+        'db': '/data/data/com.viber.voip/databases/',
+        'backup_cmd': 'com.viber.voip',
+        'parser': 'generic',
+    },
+    'Telegram': {
+        'root_only': True,
+        'db': '/data/data/org.telegram.messenger/databases/',
+        'backup_cmd': 'org.telegram.messenger',
+        'parser': 'telegram',
+    },
+    'Line': {
+        'root_only': True,
+        'db': '/data/data/jp.naver.line.android/databases/',
+        'backup_cmd': 'jp.naver.line.android',
+        'parser': 'generic',
+    },
+    'Skype': {
+        'root_only': True,
+        'db': '/data/data/com.skype.raider/databases/',
+        'backup_cmd': 'com.skype.raider',
+        'parser': 'generic',
+    },
+    'GroupMe': {
+        'root_only': True,
+        'db': '/data/data/com.groupme.android/databases/',
+        'backup_cmd': 'com.groupme.android',
+        'parser': 'generic',
+    },
+    'Kik': {
+        'root_only': True,
+        'db': '/data/data/kik.android/databases/',
+        'backup_cmd': 'kik.android',
+        'parser': 'generic',
+    },
 }
 
 
@@ -295,12 +355,63 @@ def _extract_db(udid, config, parser_type):
                 except:
                     pass
 
+            elif parser_type == 'generic':
+                try:
+                    messages = _generic_scan_db(cur, db_path)
+                except:
+                    pass
+
             conn.close()
     except Exception as e:
         print(f"    DB error: {e}")
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
+    return messages
+
+
+def _generic_scan_db(cur, db_path):
+    """Scan ANY SQLite database for message-like text."""
+    messages = []
+    try:
+        tables = [r[0] for r in cur.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+        for table in tables:
+            try:
+                cols = [r[1] for r in cur.execute(f'PRAGMA table_info("{table}")').fetchall()]
+            except:
+                continue
+            text_cols = [c for c in cols if c.lower() in ('text','message','body','content','data','caption','comment')]
+            if not text_cols:
+                text_cols = [c for c in cols if any(t in c.lower() for t in ('text','message','body','content','caption'))]
+            ts_cols = [c for c in cols if any(t in c.lower() for t in ('date','time','timestamp','sent','created'))]
+            if not text_cols:
+                continue
+            try:
+                sel = ','.join(text_cols + ts_cols[:1])
+                order = ts_cols[0] if ts_cols else '1'
+                rows = cur.execute(f'SELECT {sel} FROM "{table}" ORDER BY {order} ASC').fetchall()
+                for row in rows:
+                    text = str(row[0]) if row[0] is not None else ''
+                    if not text.strip() or text == 'None':
+                        continue
+                    ts = None
+                    if len(row) > 1 and row[1]:
+                        try:
+                            ts = datetime.fromtimestamp(float(str(row[1])) / 1000).isoformat()
+                        except:
+                            try:
+                                ts = datetime.fromtimestamp(float(str(row[1]))).isoformat()
+                            except:
+                                pass
+                    messages.append({
+                        "role": "user", "text": text.strip(),
+                        "timestamp": ts, "sender": None,
+                        "service": os.path.basename(db_path).replace('.sqlite','').replace('.db',''),
+                    })
+            except:
+                continue
+    except:
+        pass
     return messages
 
 
