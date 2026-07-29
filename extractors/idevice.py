@@ -101,13 +101,35 @@ def create_backup(udid, output_dir, apps=None, progress_cb=None):
     try:
         pair_check = subprocess.run(["idevicepair", "validate", "-u", udid], capture_output=True, text=True, timeout=10)
         if pair_check.returncode != 0:
-            if progress_cb: progress_cb(0, "❌ Phone not trusted. Tap Trust on your iPhone.")
-            print(f"  ❌ Phone not trusted. Tap 'Trust' on your iPhone, then try again.")
+            err = (pair_check.stderr or pair_check.stdout or "").strip()
+            if progress_cb: progress_cb(0, f"❌ Phone not trusted: {err}")
+            print(f"  ❌ Phone not trusted. Tap 'Trust' on your iPhone.\n  {err}")
             return None
-    except:
-        pass
+    except Exception as e:
+        print(f"  ⚠️ Pair check failed: {e}")
 
-    if progress_cb: progress_cb(5, "Backing up messages...")
+    if progress_cb: progress_cb(5, "Checking backup service...")
+
+    # Quick check: can idevicebackup2 talk to the device at all?
+    try:
+        info_check = subprocess.run(["idevicebackup2", "info", output_dir, "-u", udid],
+                                    capture_output=True, text=True, timeout=15)
+        if info_check.returncode != 0:
+            err = (info_check.stderr or info_check.stdout or "").strip()[:300]
+            if "password" in err.lower():
+                msg = "❌ Go to Settings → General → Transfer or Reset → Reset Encrypted Backup Password"
+            else:
+                msg = f"❌ idevicebackup2: {err}"
+            if progress_cb: progress_cb(0, msg)
+            print(f"  {msg}")
+            return None
+        print(f"  Backup service OK: {info_check.stdout.strip()[:200]}")
+    except subprocess.TimeoutExpired:
+        print(f"  ⚠️ Info check timed out — continuing anyway")
+    except Exception as e:
+        print(f"  ⚠️ Info check failed: {e}")
+
+    if progress_cb: progress_cb(10, "Backing up messages...")
 
     cmd = ["idevicebackup2", "backup", output_dir]
     if udid: cmd.extend(["-u", udid])
@@ -115,7 +137,7 @@ def create_backup(udid, output_dir, apps=None, progress_cb=None):
     master_fd, slave_fd = pty.openpty()
     try:
         proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=slave_fd,
-                                stderr=slave_fd, close_fds=True, preexec_fn=os.setsid)
+                                stderr=slave_fd, close_fds=True)
     except Exception as e:
         os.close(master_fd); os.close(slave_fd)
         if progress_cb: progress_cb(0, f"❌ Failed to start: {e}")
@@ -126,38 +148,31 @@ def create_backup(udid, output_dir, apps=None, progress_cb=None):
     fcntl.fcntl(master_fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
 
     buf = b''
-    last_pct = 5
+    last_pct = 10
     start_time = time.time()
     last_output = start_time
-    first_output_timeout = 20  # wait up to 20s for first output
-    global_stuck_timeout = 120  # if no output for 2 minutes after startup, kill
-    last_status_msg = "Backing up messages..."
-    read_attempts_since_data = 0
+    first_output_timeout = 20
+    global_stuck_timeout = 120
+    all_output = ""
 
     def parse_and_report(text):
-        nonlocal last_pct, last_status_msg
+        nonlocal last_pct
         m = re.search(r'(\d+\.?\d*)\s*%', text)
         if m:
             pct = int(float(m.group(1)))
-            pct = max(5, min(95, pct))
+            pct = max(10, min(95, pct))
             if pct > last_pct:
                 last_pct = pct
-                last_status_msg = f"Backing up... {pct}%"
-                if progress_cb: progress_cb(pct, last_status_msg)
-        # Check for error keywords
+                if progress_cb: progress_cb(pct, f"Backing up... {pct}%")
         low = text.lower()
         if "trust" in low and ("computer" in low or "this" in low):
-            if progress_cb: progress_cb(last_pct, "❌ Tap 'Trust' on your iPhone")
-            return "error"
+            if progress_cb: progress_cb(last_pct, "❌ Tap 'Trust' on your iPhone"); return "error"
         if "password" in low and ("set" in low or "required" in low or "not" in low):
-            if progress_cb: progress_cb(last_pct, "❌ Go to Settings → General → Transfer or Reset → Reset Encrypted Backup Password")
-            return "error"
-        if "lock" in low or ("screen" in low and ("on" in low or "unlock" in low)):
-            if progress_cb: progress_cb(last_pct, "❌ Unlock your iPhone and keep screen on")
-            return "error"
-        if "denied" in low or "refused" in low or "failed" in low:
-            if progress_cb: progress_cb(last_pct, f"❌ {text.strip()}")
-            return "error"
+            if progress_cb: progress_cb(last_pct, "❌ Go to Settings → General → Transfer or Reset → Reset Encrypted Backup Password"); return "error"
+        if ("lock" in low or "passcode" in low) and ("unlock" in low or "enter" in low or "screen" in low):
+            if progress_cb: progress_cb(last_pct, "❌ Unlock your iPhone and keep screen on"); return "error"
+        if "failed" in low or "error" in low:
+            if progress_cb: progress_cb(last_pct, f"❌ {text.strip()[:200]}"); return "error"
         return "ok"
 
     while True:
@@ -167,14 +182,11 @@ def create_backup(udid, output_dir, apps=None, progress_cb=None):
                 data = os.read(master_fd, 4096)
                 if not data: break
                 last_output = time.time()
-                read_attempts_since_data = 0
                 buf += data
+                all_output += data.decode('utf-8', errors='replace')
                 decoded = buf.decode('utf-8', errors='replace')
-                # Strip ANSI escape sequences
                 clean = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', decoded)
-                clean = re.sub(r'\x1b\].*?\x07', '', clean)
-                clean = re.sub(r'\r', '\n', clean)  # treat \r as newline
-                # Process any complete lines
+                clean = re.sub(r'\r', '\n', clean)
                 for line in clean.split('\n'):
                     line = line.strip()
                     if line:
@@ -186,25 +198,19 @@ def create_backup(udid, output_dir, apps=None, progress_cb=None):
             except OSError:
                 break
         else:
-            read_attempts_since_data += 1
-            # Check if process has exited
             ret = proc.poll()
             if ret is not None:
                 break
-            # Timeouts
             elapsed = time.time() - start_time
-            if elapsed > 300:  # 5 min overall
+            if elapsed > 300:
                 proc.kill()
                 if progress_cb: progress_cb(last_pct, "⏱️ Backup timed out (5 min)")
                 os.close(master_fd)
                 return None
-            # Stuck detection
             stuck_time = elapsed - (last_output - start_time)
             if elapsed > first_output_timeout and stuck_time > global_stuck_timeout:
                 if progress_cb: progress_cb(last_pct, "⏱️ Backup stuck — unplug/replug iPhone and try again")
-                proc.kill()
-                os.close(master_fd)
-                return None
+                proc.kill(); os.close(master_fd); return None
 
     proc.wait()
     os.close(master_fd)
@@ -216,7 +222,10 @@ def create_backup(udid, output_dir, apps=None, progress_cb=None):
             manifest = plistlib.load(f)
         return manifest
     else:
-        if progress_cb: progress_cb(last_pct, "❌ Backup incomplete (no manifest)")
+        # Show all captured output for debugging
+        debug = all_output.strip()[:500]
+        print(f"  ⚠️ No manifest. idevicebackup2 output: {debug}")
+        if progress_cb: progress_cb(last_pct, f"❌ Backup failed: {debug or 'no output from idevicebackup2'}")
         return None
 
 
