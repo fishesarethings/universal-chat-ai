@@ -225,10 +225,23 @@ def _load_messages():
     return []
 def _save_messages(m):
     with open(MESSAGES_FILE, 'w', encoding='utf-8') as f: json.dump(m, f, indent=2, ensure_ascii=False)
+def _clean_text(t):
+    if not t: return ''
+    import re, unicodedata
+    t = unicodedata.normalize('NFKC', str(t))
+    t = re.sub(r'&amp;', '&', t); t = re.sub(r'&lt;', '<', t); t = re.sub(r'&gt;', '>', t)
+    t = re.sub(r'&quot;', '"', t); t = re.sub(r'&#\d+;', ' ', t); t = re.sub(r'&[a-zA-Z]+;', ' ', t)
+    t = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', t)
+    t = re.sub(r'\r\n?', '\n', t); t = re.sub(r'[ \t]+\n', '\n', t)
+    t = re.sub(r'\n{3,}', '\n\n', t); t = t.strip()
+    return t
+
 def _rebuild_training_files(messages):
     with open(FORMATTED_FILE, 'w', encoding='utf-8') as f:
         for m in messages:
-            f.write(f'{"user" if m["role"]=="user" else "assistant"}: {m["text"]}\n')
+            text = _clean_text(m.get('text', ''))
+            if not text: continue
+            f.write(f'{"user" if m["role"]=="user" else "assistant"}: {text}\n')
 def _count_messages():
     try: return len(_load_messages())
     except: return 0
