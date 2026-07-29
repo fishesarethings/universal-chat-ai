@@ -110,14 +110,27 @@ def create_backup(udid, output_dir, apps=None, progress_cb=None, backup_password
 
     if progress_cb: progress_cb(5, "Backing up messages...")
 
-    cmd = ["idevicebackup2", "backup", output_dir]
+    # Check if phone is locked
+    try:
+        diag_check = subprocess.run(["idevicediagnostics", "-u", udid, "IORegistry", "AppleARMPMDevice"],
+                                     capture_output=True, text=True, timeout=10)
+        if diag_check.returncode == 0:
+            output = (diag_check.stdout or "").lower()
+            if "sleep" in output or "lock" in output or "suspend" in output:
+                print(f"  ⚠️ Phone may be locked — keep screen on and enter passcode")
+                if progress_cb: progress_cb(0, "⚠️ Unlock iPhone and keep screen on")
+                # Don't return — try anyway
+    except:
+        pass
+
+    cmd = ["idevicebackup2", "-d", "backup", output_dir]
     if udid: cmd.extend(["-u", udid])
 
     # Quick diagnostic: try a different temp dir to see if it instantly errors
     if progress_cb: progress_cb(5, "Diagnosing...")
     diag_dir = tempfile.mkdtemp(prefix="iphone_diag_")
     try:
-        diag_cmd = ["idevicebackup2", "backup", diag_dir]
+        diag_cmd = ["idevicebackup2", "-d", "backup", diag_dir]
         if udid: diag_cmd.extend(["-u", udid])
         diag_env = os.environ.copy()
         if backup_password: diag_env["BACKUP_PASSWORD"] = backup_password
@@ -171,6 +184,7 @@ def create_backup(udid, output_dir, apps=None, progress_cb=None, backup_password
     first_output_timeout = 20
     global_stuck_timeout = 120
     all_output = ""
+    timed_out = False
 
     def parse_and_report(text):
         nonlocal last_pct
@@ -209,9 +223,8 @@ def create_backup(udid, output_dir, apps=None, progress_cb=None, backup_password
                     if line:
                         status = parse_and_report(line)
                         if status == "error":
-                            proc.kill()
-                            os.close(master_fd)
-                            return None
+                            timed_out = True; proc.kill(); break
+                if timed_out: break
             except OSError:
                 break
         else:
@@ -220,17 +233,12 @@ def create_backup(udid, output_dir, apps=None, progress_cb=None, backup_password
                 break
             elapsed = time.time() - start_time
             if elapsed > 300:
-                proc.kill()
-                if progress_cb: progress_cb(last_pct, "⏱️ Backup timed out (5 min)")
-                os.close(master_fd)
-                return None
+                timed_out = True; proc.kill(); break
             stuck_time = elapsed - (last_output - start_time)
             if elapsed > first_output_timeout and stuck_time > global_stuck_timeout:
-                if progress_cb: progress_cb(last_pct, "⏱️ Backup stuck — unplug/replug iPhone and try again")
-                proc.kill(); os.close(master_fd); return None
+                timed_out = True; proc.kill(); break
 
     proc.wait()
-    # Read any remaining output after process exits
     try:
         while True:
             d = os.read(master_fd, 4096)
@@ -246,20 +254,23 @@ def create_backup(udid, output_dir, apps=None, progress_cb=None, backup_password
         with open(manifest_path, 'rb') as f:
             manifest = plistlib.load(f)
         return manifest
-    else:
-        debug = all_output.strip()[:600]
-        print(f"  ⚠️ idevicebackup2 exit code={return_code}, output: {debug}")
-        if return_code != 0 and not debug:
-            # Try direct capture to see the error
-            try:
-                diag = subprocess.run(["idevicebackup2", "backup", output_dir, "-u", udid],
-                                      capture_output=True, text=True, timeout=15, input="")
-                debug = (diag.stderr or diag.stdout or "").strip()[:300]
-                print(f"  Direct capture: exit={diag.returncode}: {debug}")
-            except Exception as e:
-                debug = str(e)
-        if progress_cb: progress_cb(last_pct, f"❌ Backup failed: {debug or 'unknown error (try manual: idevicebackup2 backup ...)'}")
-        return None
+
+    # Backup failed — capture debug output
+    debug = all_output.strip()[:800]
+    print(f"  ⚠️ exit={return_code} timed_out={timed_out} output: {debug[:200]}")
+    if timed_out or not debug:
+        try:
+            diag = subprocess.run(["idevicebackup2", "-d", "backup", output_dir, "-u", udid or ""],
+                                  capture_output=True, text=True, timeout=15, input="")
+            debug = (diag.stderr or diag.stdout or "").strip()[:300]
+            print(f"  Direct: exit={diag.returncode}: {debug[:200]}")
+        except subprocess.TimeoutExpired:
+            if not debug:
+                debug = "Backup process hangs — upgrade libimobiledevice: brew upgrade libimobiledevice"
+        except Exception as e:
+            debug = str(e)
+    if progress_cb: progress_cb(last_pct, f"❌ {debug or 'unknown error'}")
+    return None
 
 
 def extract_from_backup(backup_dir, app_name):
@@ -556,7 +567,7 @@ def extract(udid=None, selected_apps=None, max_messages=None, progress_cb=None, 
     try:
         manifest = create_backup(udid, backup_dir, progress_cb=progress_cb, backup_password=backup_password)
         if manifest is None:
-            raise RuntimeError("Backup failed — unlock phone, tap Trust, then try again")
+            return []  # Error already reported via progress_cb
 
         if progress_cb: progress_cb(95, "Reading messages...")
         for app_name in selected_apps:
