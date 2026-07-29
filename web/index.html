@@ -53,7 +53,7 @@ select,input{background:#1e1e3a;color:var(--text);border:1px solid #333;padding:
 <div id="setup">
   <div class="icon" id="sIcon">🧠</div>
   <h1>Chat AI</h1>
-  <p>AI trained on your messages. Runs on your computer.</p>
+  <p>Plug your phone into your computer. Extract all messages. Train an AI on them.</p>
   <div class="box" id="sBox"><div id="sContent"></div></div>
 </div>
 
@@ -170,48 +170,49 @@ function showSetup() {
 }
 
 function showDownloadInstructions(os) {
+  let phoneNote = 'Use a USB cable to connect your iPhone or Android to this computer.';
+  if (os === 'windows') phoneNote = 'Use a USB cable to connect your Android to this PC. (iPhone requires a Mac.)';
   let html = `
-    <div class="icon" style="font-size:36px;margin-bottom:8px">⬇️</div>
-    <p style="font-size:14px;color:var(--text);margin-bottom:4px">Two ways to run:</p>
-    <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Pick one — both do the same thing.</p>
+    <div class="icon" style="font-size:36px;margin-bottom:8px">💻</div>
+    <p style="font-size:14px;color:var(--text);margin-bottom:4px">Run this on your computer:</p>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:6px">${phoneNote}</p>
 
-    <div style="background:#1a1a2e;border-radius:8px;padding:14px;margin-bottom:10px;text-align:left">
-      <div style="font-weight:600;margin-bottom:6px">✅ Easy — one command in Terminal</div>
+    <div style="background:#1a1a2e;border:1px solid var(--primary);border-radius:8px;padding:14px;margin-bottom:12px;text-align:left">
+      <div style="font-weight:600;margin-bottom:6px;color:var(--primary)">✅ One command — paste in Terminal</div>
       <code style="font-size:11px;display:block;padding:8px;background:#0a0a1a;border-radius:4px;word-break:break-all"
-        onclick="navigator.clipboard.writeText(this.textContent)">bash <(curl -s https://fishesarethings.github.io/universal-chat-ai/install.sh)</code>
-      <div style="font-size:10px;color:var(--text2);margin-top:4px">Click to copy. Paste in Terminal, press Enter. Wait.</div>
+        onclick="navigator.clipboard.writeText(this.textContent);this.style.border='1px solid var(--primary)'">bash <(curl -s https://fishesarethings.github.io/universal-chat-ai/install.sh)</code>
+      <div style="font-size:10px;color:var(--text2);margin-top:4px">Click to copy. Paste, press Enter. Downloads everything and launches.</div>
     </div>
 
-    <div style="background:#1a1a2e;border-radius:8px;padding:14px;margin-bottom:10px;text-align:left">
-      <div style="font-weight:600;margin-bottom:6px">📦 Harder — download the app</div>
-      <p style="font-size:11px;color:var(--text2);margin-bottom:6px">
-        ${os === 'windows' ? 'Android phones only (iPhone needs a Mac).' : 'Works with iPhone + Android.'}</p>
-      <a class="btn btn-primary" href="https://github.com/fishesarethings/universal-chat-ai/releases"
-         style="font-size:13px;padding:10px;margin:0">⬇ Download .zip</a>
-      <ol style="font-size:11px;color:var(--text2);margin-top:8px;padding-left:16px;line-height:1.8">
-        ${os === 'mac' ? `
-        <li>Unzip the downloaded file</li>
-        <li>Right-click the app → <b>Open</b> (not double-click)</li>
-        <li>Click <b>Open</b> in the popup</li>
-        <li>Terminal opens and starts the server</li>` : `
-        <li>Unzip the downloaded file</li>
-        <li>Open Terminal / Command Prompt in the folder</li>
-        <li><code style="font-size:10px">pip install flask torch</code></li>
-        <li><code style="font-size:10px">python server.py</code></li>`}
-      </ol>
-    </div>
+    <details style="text-align:left;font-size:12px;color:var(--text2);margin-bottom:12px">
+      <summary style="cursor:pointer">📦 Or download the .zip (more steps)</summary>
+      <div style="margin-top:8px">
+        <a class="btn btn-primary" href="https://github.com/fishesarethings/universal-chat-ai/releases"
+           style="font-size:13px;padding:10px;margin:0">⬇ Download .zip</a>
+        <ol style="margin-top:8px;padding-left:16px;line-height:1.8;font-size:11px">
+          ${os === 'mac' ? `
+          <li>Unzip</li>
+          <li>Right-click app → <b>Open</b> (not double-click)</li>
+          <li>Click <b>Open</b> in the popup</li>` : `
+          <li>Unzip</li>
+          <li>Open Terminal in the folder</li>
+          <li><code style="font-size:10px">pip install flask torch</code></li>
+          <li><code style="font-size:10px">python server.py</code></li>`}
+        </ol>
+      </div>
+    </details>
 
     <div style="text-align:left;font-size:11px;color:var(--text2);background:#1a1a2e;padding:10px;border-radius:8px">
-      <b>Once it's running:</b>
+      <b>After it's running:</b>
       <ol style="margin:4px 0 0 16px;line-height:1.8">
-        <li>Plug in your phone via USB</li>
-        <li>iPhone: tap <b>Trust</b> on your phone</li>
-        <li>Android: enable <b>USB Debugging</b> in Developer Options</li>
-        <li>Refresh this page → it connects → go to <b>Train</b> tab → tap <b>Extract</b></li>
+        <li>Connect your phone to this computer via USB</li>
+        <li>iPhone → tap <b>Trust</b> on your phone</li>
+        <li>Android → enable <b>USB Debugging</b> (Developer Options)</li>
+        <li>Refresh this page → go to <b>Train</b> tab → tap <b>Extract All Messages</b></li>
       </ol>
     </div>
 
-    <button class="btn btn-outline" onclick="check()" style="margin-top:12px;font-size:13px">🔄 Refresh (do this after running)</button>`;
+    <button class="btn btn-outline" onclick="check()" style="margin-top:12px;font-size:13px">🔄 Refresh (after running the command)</button>`;
   document.getElementById('sContent').innerHTML = html;
 }
 
@@ -221,7 +222,7 @@ function showLocalInstructions(isMac, isWindows) {
     html = `
       <div class="icon" style="font-size:36px;margin-bottom:8px">💻</div>
       <p style="font-size:13px;margin-bottom:12px">Mac ready. Plug in your phone.</p>
-      <div class="step"><div class="num">1</div> Plug in iPhone or Android via USB</div>
+      <div class="step"><div class="num">1</div> Connect iPhone/Android via USB cable</div>
       <div class="step"><div class="num">2</div> Go to <b>Train</b> tab</div>
       <div class="step"><div class="num">3</div> Tap <b>Extract All Messages</b></div>
       <div class="step"><div class="num">4</div> Train, then Chat!</div>
