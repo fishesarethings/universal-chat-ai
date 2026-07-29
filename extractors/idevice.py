@@ -100,8 +100,19 @@ def get_available_apps(udid):
 
 def create_backup(udid, output_dir, apps=None):
     print(f"  Creating iPhone backup (this may take a few minutes)...")
+    print(f"  Keep your iPhone unlocked and screen on.")
+
+    # Check if phone is paired/trusted
     try:
-        cmd = ["idevicebackup2", "backup", "--full", output_dir]
+        pair_check = subprocess.run(["idevicepair", "validate", "-u", udid], capture_output=True, text=True, timeout=10)
+        if pair_check.returncode != 0:
+            print(f"  ❌ Phone not trusted. Tap 'Trust' on your iPhone, then try again.")
+            return None
+    except:
+        pass
+
+    try:
+        cmd = ["idevicebackup2", "backup", output_dir]
         if udid:
             cmd.extend(["-u", udid])
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
@@ -111,10 +122,18 @@ def create_backup(udid, output_dir, apps=None):
                 manifest = plistlib.load(f)
             return manifest
         else:
-            print(f"  Backup created but no manifest found")
+            # Check for common errors in output
+            out = (proc.stdout + " " + proc.stderr).lower()
+            if "device" in out and ("lock" in out or "screen" in out or "passcode" in out):
+                print(f"  ❌ Unlock your iPhone and keep screen on, then try again.")
+            elif "trust" in out:
+                print(f"  ❌ Tap 'Trust' on your iPhone, then try again.")
+            else:
+                print(f"  Backup created but no manifest found")
             return None
     except subprocess.TimeoutExpired:
-        print(f"  Backup timed out. Try manually: idevicebackup2 backup --full {output_dir}")
+        print(f"  ⏱️  Backup timed out (5 min). Keep phone unlocked and try again.")
+        print(f"  If it keeps failing, run: idevicebackup2 backup -u {udid} /tmp/backup")
         return None
     except Exception as e:
         print(f"  Backup failed: {e}")
@@ -414,7 +433,7 @@ def extract(udid=None, selected_apps=None, max_messages=None):
     try:
         manifest = create_backup(udid, backup_dir)
         if manifest is None:
-            raise RuntimeError("Backup failed or timed out")
+            raise RuntimeError("Backup failed — unlock phone, tap Trust, then try again")
 
         for app_name in selected_apps:
             if app_name in EXTRACTABLE_FROM_BACKUP:
