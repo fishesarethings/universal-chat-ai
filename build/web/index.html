@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="/manifest.json">
+<meta name="description" content="Train a personal AI on your messages from any service. Processing happens on your device.">
+<title>Universal Chat AI</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--bg:#0a0a1a;--surface:#141428;--surface2:#1e1e3a;--surface3:#2a2a4a;--primary:#00d4aa;--primary-dim:#00a888;--text:#e0e0f0;--text2:#8888aa;--danger:#ff4466;--radius:12px;--radius-sm:8px}
+body{font-family:-apple-system,'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);height:100dvh;display:flex;flex-direction:column;overflow:hidden;position:fixed;width:100%;top:0;left:0;overscroll-behavior:none}
+.safe-top{padding-top:env(safe-area-inset-top,0)}.safe-bottom{padding-bottom:env(safe-area-inset-bottom,0)}
+
+/* Setup screen */
+#setup-screen{position:fixed;inset:0;background:var(--bg);z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;overflow-y:auto}
+#setup-screen.hidden{display:none}
+#setup-screen .logo{font-size:48px;margin-bottom:12px}
+#setup-screen h1{font-size:22px;font-weight:700;margin-bottom:4px}
+#setup-screen .sub{color:var(--text2);font-size:14px;margin-bottom:20px;max-width:400px;line-height:1.5}
+#setup-screen .status-box{background:var(--surface);border-radius:var(--radius);padding:20px;max-width:420px;width:100%;border:1px solid var(--surface3)}
+#setup-screen .status-box .icon{font-size:32px;margin-bottom:8px}
+#setup-screen .status-box .msg{font-size:14px;color:var(--text2);margin-bottom:12px}
+#setup-screen .btn-wrap{display:flex;flex-direction:column;gap:8px;margin-top:16px;width:100%}
+#setup-screen .btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 20px;border-radius:var(--radius-sm);border:none;font-size:15px;font-weight:600;cursor:pointer;text-decoration:none;transition:.15s}
+#setup-screen .btn:active{transform:scale(.97)}
+#setup-screen .btn-primary{background:var(--primary);color:#0a0a1a}
+#setup-screen .btn-primary:hover{background:var(--primary-dim)}
+#setup-screen .btn-outline{background:transparent;border:1px solid var(--surface3);color:var(--text)}
+#setup-screen .btn-outline:hover{border-color:var(--primary)}
+#setup-screen .steps{max-width:420px;width:100%;margin-top:16px}
+#setup-screen .step{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--surface3);text-align:left;font-size:13px}
+#setup-screen .step:last-child{border-bottom:none}
+#setup-screen .step-num{width:24px;height:24px;border-radius:12px;background:var(--primary);color:#0a0a1a;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;margin-top:1px}
+#setup-screen .step-done .step-num{background:var(--primary)}
+#setup-screen .step-done .step-text{color:var(--primary)}
+#setup-screen .step-text{flex:1;line-height:1.4;color:var(--text2)}
+#setup-screen .step-text strong{color:var(--text)}
+#setup-screen .code-block{background:var(--surface2);border-radius:var(--radius-sm);padding:12px 16px;font-family:'SF Mono','Fira Code',monospace;font-size:13px;color:var(--primary);margin:8px 0;text-align:left;cursor:pointer}
+
+/* Tabs */
+.tabs{display:flex;background:var(--surface);border-bottom:1px solid var(--surface3);flex-shrink:0}
+.tab{flex:1;padding:10px 4px;text-align:center;font-size:12px;font-weight:500;color:var(--text2);cursor:pointer;transition:.2s;border-bottom:2px solid transparent;-webkit-user-select:none;user-select:none}
+.tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+.tab .icon{font-size:18px;display:block;margin-bottom:1px}
+
+#chat-tab{flex:1;display:flex;flex-direction:column;min-height:0}
+.chat-messages{flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:6px;-webkit-overflow-scrolling:touch}
+.msg{max-width:88%;padding:10px 14px;border-radius:18px;font-size:15px;line-height:1.45;word-wrap:break-word;animation:fadeIn .2s}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.msg.user{align-self:flex-end;background:var(--primary);color:#0a0a1a;border-bottom-right-radius:4px}
+.msg.assistant{align-self:flex-start;background:var(--surface2);color:var(--text);border-bottom-left-radius:4px}
+.msg.system{align-self:center;background:transparent;color:var(--text2);font-size:12px;max-width:100%;text-align:center;padding:4px 8px}
+.chat-input{display:flex;gap:8px;padding:10px 12px;background:var(--surface);border-top:1px solid var(--surface3);flex-shrink:0}
+.chat-input input{flex:1;padding:12px 16px;border-radius:24px;border:1px solid var(--surface3);background:var(--surface2);color:var(--text);font-size:15px;outline:none;min-width:0}
+.chat-input input:focus{border-color:var(--primary)}
+.chat-input button{padding:12px 20px;border-radius:24px;border:none;background:var(--primary);color:#0a0a1a;font-size:14px;font-weight:600;cursor:pointer;transition:.15s;flex-shrink:0}
+.chat-input button:disabled{opacity:.4;cursor:not-allowed}
+
+#train-tab{flex:1;display:none;flex-direction:column;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch}
+.card{background:var(--surface);border-radius:var(--radius);padding:16px;margin-bottom:12px;border:1px solid var(--surface3)}
+.card h3{font-size:13px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stat{background:var(--surface2);border-radius:var(--radius-sm);padding:12px;text-align:center}
+.stat .val{font-size:20px;font-weight:700;color:var(--primary)}
+.stat .lbl{font-size:11px;color:var(--text2);margin-top:2px}
+.progress-bar{height:8px;background:var(--surface3);border-radius:4px;overflow:hidden;margin:10px 0}
+.progress-bar .fill{height:100%;background:linear-gradient(90deg,var(--primary),#00ffcc);border-radius:4px;transition:width .3s ease;width:0%}
+.train-status{display:flex;justify-content:space-between;font-size:13px;color:var(--text2);margin-bottom:4px}
+.train-status .loss{color:var(--primary);font-weight:600}
+
+#extract-tab{flex:1;display:none;flex-direction:column;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch}
+.extractor-item{background:var(--surface);border-radius:var(--radius-sm);padding:14px;margin-bottom:8px;border:1px solid var(--surface3);display:flex;justify-content:space-between;align-items:center}
+.extractor-item .info{flex:1;min-width:0}
+.extractor-item .name{font-weight:600;font-size:14px}
+.extractor-item .desc{font-size:12px;color:var(--text2);margin-top:2px}
+.extractor-item .badge{font-size:11px;padding:3px 8px;border-radius:10px;background:var(--surface3);color:var(--text2)}
+.extractor-item .badge.avail{background:var(--primary);color:#0a0a1a}
+.btn{display:inline-flex;align-items:center;gap:4px;padding:8px 16px;border-radius:var(--radius-sm);border:none;font-size:13px;font-weight:500;cursor:pointer;transition:.15s}
+.btn:active{transform:scale(.96)}
+.btn-primary{background:var(--primary);color:#0a0a1a}
+.btn-primary:hover{background:var(--primary-dim)}
+.btn-outline{background:transparent;border:1px solid var(--surface3);color:var(--text);padding:7px 15px}
+.btn-outline:hover{border-color:var(--primary);color:var(--primary)}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-block{width:100%;justify-content:center}
+
+#services-tab{flex:1;display:none;flex-direction:column;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch}
+.file-drop{background:var(--surface);border:2px dashed var(--surface3);border-radius:var(--radius);padding:30px 20px;text-align:center;margin-bottom:12px;transition:.2s;cursor:pointer}
+.file-drop.dragover{border-color:var(--primary);background:var(--surface2)}
+.file-drop .icon{font-size:32px;margin-bottom:4px}
+.file-drop .hint{font-size:13px;color:var(--text2)}
+.source-select{width:100%;padding:10px 12px;border-radius:var(--radius-sm);border:1px solid var(--surface3);background:var(--surface2);color:var(--text);font-size:14px;margin-bottom:10px;outline:none}
+.source-select:focus{border-color:var(--primary)}
+
+#settings-tab{flex:1;display:none;flex-direction:column;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch}
+.setting-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--surface3)}
+.setting-row:last-child{border-bottom:none}
+.setting-row .lbl{font-size:14px}
+.setting-row .desc{font-size:12px;color:var(--text2);margin-top:2px}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100px;height:4px;border-radius:2px;background:var(--surface3);outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;border-radius:50%;background:var(--primary);cursor:pointer}
+input[type=number],input[type=text]{padding:6px 10px;border-radius:var(--radius-sm);border:1px solid var(--surface3);background:var(--surface2);color:var(--text);font-size:13px;width:70px;outline:none}
+input[type=number]:focus,input[type=text]:focus{border-color:var(--primary)}
+select{background:var(--surface2);color:var(--text);border:1px solid var(--surface3);padding:6px 10px;border-radius:var(--radius-sm);font-size:13px;outline:none}
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--surface2);color:var(--text);padding:10px 20px;border-radius:var(--radius);font-size:13px;z-index:100;border:1px solid var(--surface3);opacity:0;transition:.3s;pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1}
+.import-result{margin-top:8px;padding:10px;border-radius:var(--radius-sm);background:var(--surface2);font-size:13px;color:var(--text2);display:none}
+</style>
+</head>
+<body>
+
+<div id="setup-screen">
+  <div class="logo">🧠</div>
+  <h1>Universal Chat AI</h1>
+  <div class="sub">Train a personal AI on your messages from any messaging service. All processing happens on <strong>your device</strong>.</div>
+  <div class="status-box" id="setupStatus">
+    <div class="icon" id="setupIcon">🔍</div>
+    <div class="msg" id="setupMsg">Looking for local backend...</div>
+    <div class="steps" id="setupSteps">
+      <div class="step" id="step1">
+        <div class="step-num">1</div>
+        <div class="step-text"><strong>Download</strong> the desktop backend for your platform</div>
+      </div>
+      <div class="step" id="step2">
+        <div class="step-num">2</div>
+        <div class="step-text">Run this in your terminal:</div>
+      </div>
+      <div class="step" id="step3">
+        <div class="step-num">3</div>
+        <div class="step-text">Open <strong>http://127.0.0.1:5050</strong> or refresh this page</div>
+      </div>
+    </div>
+    <div class="btn-wrap" id="setupButtons" style="display:none">
+      <a class="btn btn-primary" id="downloadBtn" href="#">⬇ Download Desktop Backend</a>
+      <button class="btn btn-outline" onclick="retryConnect()">🔄 Retry Connection</button>
+      <button class="btn btn-outline" onclick="continueOffline()">Continue without backend</button>
+    </div>
+  </div>
+</div>
+
+<div class="tabs safe-top" id="tabs">
+  <div class="tab active" data-tab="chat"><span class="icon">💬</span>Chat</div>
+  <div class="tab" data-tab="train"><span class="icon">🧠</span>Train</div>
+  <div class="tab" data-tab="extract"><span class="icon">📥</span>Extract</div>
+  <div class="tab" data-tab="services"><span class="icon">📤</span>Import</div>
+  <div class="tab" data-tab="settings"><span class="icon">⚙️</span>Settings</div>
+</div>
+
+<div id="chat-tab">
+  <div class="chat-messages" id="chatMessages">
+    <div class="msg system">Loading...</div>
+  </div>
+  <div class="chat-input safe-bottom" style="display:none" id="chatInputArea">
+    <input type="text" id="chatInput" placeholder="Type a message..." autocomplete="off">
+    <button id="sendBtn" onclick="send()">Send</button>
+  </div>
+  <div class="chat-messages" id="chatDisabledMsg" style="display:none;justify-content:center;align-items:center">
+    <div class="msg system">Backend not connected. Run the desktop backend and refresh.</div>
+  </div>
+</div>
+
+<div id="train-tab">
+  <div class="card">
+    <h3>Training Progress</h3>
+    <div class="train-status"><span id="trainStatus">Idle</span><span class="loss" id="trainLoss">Loss: --</span></div>
+    <div class="progress-bar"><div class="fill" id="trainFill"></div></div>
+    <div class="stat-grid">
+      <div class="stat"><div class="val" id="statEpoch">0/0</div><div class="lbl">Epoch</div></div>
+      <div class="stat"><div class="val" id="statLoss">--</div><div class="lbl">Best Loss</div></div>
+      <div class="stat"><div class="val" id="statMsgs">0</div><div class="lbl">Messages</div></div>
+      <div class="stat"><div class="val" id="statETA">--</div><div class="lbl">ETA</div></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Training Controls</h3>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <select id="trainModelSize" style="flex:1;min-width:80px">
+          <option value="tiny">Tiny (fast)</option>
+          <option value="small" selected>Small</option>
+          <option value="medium">Medium</option>
+          <option value="large">Large (slow)</option>
+        </select>
+        <input type="number" id="trainEpochs" value="20" min="1" max="500" style="width:60px">
+        <label style="font-size:12px;display:flex;align-items:center;gap:4px;color:var(--text2)"><input type="checkbox" id="trainResume"> Resume</label>
+      </div>
+      <button class="btn btn-primary btn-block" id="trainBtn" onclick="toggleTrain()" disabled>▶ Start Training</button>
+    </div>
+  </div>
+</div>
+
+<div id="extract-tab">
+  <div class="card" id="extractorsList">
+    <h3>Message Sources</h3>
+    <div id="extractorsContainer"></div>
+    <button class="btn btn-primary btn-block" onclick="runExtractAll()" style="margin-top:10px">📥 Extract from All Available</button>
+  </div>
+</div>
+
+<div id="services-tab">
+  <div class="card">
+    <h3>Import Messages from File</h3>
+    <div class="file-drop" id="fileDrop" onclick="document.getElementById('fileInput').click()">
+      <div class="icon">📁</div>
+      <div class="hint">Drop a file here or tap to browse</div>
+    </div>
+    <input type="file" id="fileInput" accept=".json,.txt,.csv,.xml,.zip,.ndjson,.jsonl" style="display:none">
+    <select class="source-select" id="importSource">
+      <option value="Generic Import">Auto-detect format</option>
+      <option value="Google Messages">Google Messages / SMS Backup</option>
+      <option value="iMessage">iMessage</option>
+      <option value="Discord">Discord Data Package</option>
+      <option value="Signal">Signal</option>
+      <option value="WhatsApp">WhatsApp Export</option>
+      <option value="Snapchat">Snapchat My Data</option>
+    </select>
+    <button class="btn btn-primary btn-block" onclick="uploadImport()">📤 Import File</button>
+    <div class="import-result" id="importResult"></div>
+  </div>
+  <div class="card">
+    <h3>Message Stats</h3>
+    <div class="stat-grid" id="statsGrid">
+      <div class="stat"><div class="val" id="mTotal">0</div><div class="lbl">Total</div></div>
+      <div class="stat"><div class="val" id="mUser">0</div><div class="lbl">Received</div></div>
+      <div class="stat"><div class="val" id="mAssistant">0</div><div class="lbl">Sent</div></div>
+      <div class="stat"><div class="val" id="mChars">0</div><div class="lbl">Characters</div></div>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px">
+      <button class="btn btn-outline btn-block btn-sm" onclick="exportData('json')">Export JSON</button>
+      <button class="btn btn-outline btn-block btn-sm" onclick="exportData('formatted')">Export Train</button>
+    </div>
+  </div>
+</div>
+
+<div id="settings-tab">
+  <div class="card">
+    <h3>Generation</h3>
+    <div class="setting-row">
+      <div><div class="lbl">Temperature</div><div class="desc">Creativity (0.1-1.5)</div></div>
+      <span><span id="tempVal">0.9</span> <input type="range" id="temp" min="0.1" max="1.5" step="0.1" value="0.9" oninput="tempVal.textContent=this.value"></span>
+    </div>
+    <div class="setting-row">
+      <div><div class="lbl">Top-K</div><div class="desc">Word variety</div></div>
+      <input type="number" id="topk" value="50" min="1" max="200">
+    </div>
+    <div class="setting-row">
+      <div><div class="lbl">Max Tokens</div><div class="desc">Response length</div></div>
+      <input type="number" id="maxlen" value="100" min="10" max="500">
+    </div>
+  </div>
+  <div class="card">
+    <h3>Connection</h3>
+    <div class="setting-row">
+      <div><div class="lbl">Backend</div><div class="desc">Local processing server</div></div>
+      <span id="connStatus" style="font-size:13px;color:var(--text2)">Checking...</span>
+    </div>
+    <div class="setting-row">
+      <div><div class="lbl">Backend Address</div><div class="desc">Change if using a different port</div></div>
+      <input type="text" id="backendUrl" value="http://127.0.0.1:5050" style="width:160px">
+    </div>
+    <button class="btn btn-outline btn-block btn-sm" onclick="reconnect()">🔄 Reconnect</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API_BACKEND = ''; // empty = detect
+
+let backendUrl = localStorage.getItem('backendUrl') || 'http://127.0.0.1:5050';
+let connected = false;
+let state = {messages:[],stats:{},extractors:[],trainRunning:false};
+let trainPoll = null;
+let generating = false;
+
+function log(...args) { console.log('[UAI]', ...args); }
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(()=>el.classList.remove('show'), 2500);
+}
+
+function baseURL() {
+  const custom = document.getElementById('backendUrl');
+  if (custom) backendUrl = custom.value || backendUrl;
+  return backendUrl;
+}
+
+async function api(method, path, body) {
+  const url = baseURL() + path;
+  const opts = {method,headers:{'Content-Type':'application/json'}};
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(url, opts);
+  if (!r.ok) {
+    const txt = await r.text();
+    let msg = txt;
+    try { const j = JSON.parse(txt); msg = j.error || txt; } catch(e) {}
+    throw new Error(msg);
+  }
+  return r.json();
+}
+
+// Tab switching
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    document.querySelectorAll('#chat-tab,#train-tab,#extract-tab,#services-tab,#settings-tab').forEach(p=>p.style.display='none');
+    document.getElementById(tab.dataset.tab + '-tab').style.display = 'flex';
+    if (tab.dataset.tab === 'services') loadStats();
+    if (tab.dataset.tab === 'extract') loadExtractors();
+    if (tab.dataset.tab === 'train') updateTrainUI();
+  });
+});
+
+// Backend connection detection
+async function checkBackend() {
+  const el = document.getElementById('setupStatus');
+  const icon = document.getElementById('setupIcon');
+  const msg = document.getElementById('setupMsg');
+  const steps = document.getElementById('setupSteps');
+  const buttons = document.getElementById('setupButtons');
+
+  icon.textContent = '🔍';
+  msg.textContent = 'Looking for local backend on ' + baseURL() + '...';
+
+  try {
+    const status = await api('GET','/api/status');
+    connected = true;
+    icon.textContent = '✅';
+    msg.textContent = 'Backend connected! Your data stays on your device.';
+    steps.style.display = 'none';
+    buttons.style.display = 'none';
+    document.getElementById('setup-screen').classList.add('hidden');
+    document.getElementById('chatInputArea').style.display = 'flex';
+    document.getElementById('chatDisabledMsg').style.display = 'none';
+    document.getElementById('connStatus').textContent = '✅ Connected';
+    document.getElementById('trainBtn').disabled = false;
+    initApp(status);
+    return true;
+  } catch(e) {
+    connected = false;
+    icon.textContent = '🔌';
+    msg.textContent = 'Backend not found. Download and run it on your computer.';
+    steps.style.display = 'block';
+    buttons.style.display = 'flex';
+    document.getElementById('connStatus').textContent = '❌ Disconnected';
+
+    const step1 = document.getElementById('step1');
+    const step2 = document.getElementById('step2');
+    const step3 = document.getElementById('step3');
+
+    step1.classList.remove('step-done');
+    step2.classList.remove('step-done');
+    step3.classList.remove('step-done');
+
+    step2.querySelector('.step-text').innerHTML = 'Run this in your terminal:<div class="code-block" onclick="copyCode(this)">pip install flask torch psutil pandas<br>python server.py</div>';
+
+    const downloadBtn = document.getElementById('downloadBtn');
+    downloadBtn.href = baseURL() + '/download/desktop-backend.zip';
+    downloadBtn.onclick = function(e) {
+      e.preventDefault();
+      showDownloadInstructions();
+    };
+
+    document.getElementById('setup-screen').classList.remove('hidden');
+    document.getElementById('chatInputArea').style.display = 'none';
+    document.getElementById('chatDisabledMsg').style.display = 'flex';
+    document.getElementById('trainBtn').disabled = true;
+    return false;
+  }
+}
+
+function showDownloadInstructions() {
+  const msg = document.getElementById('setupMsg');
+  msg.innerHTML = `
+    <strong>Download the desktop backend:</strong><br><br>
+    <b>Option 1: One-line install (Mac/Linux)</b>
+    <div class="code-block" onclick="copyCode(this)">curl -L https://github.com/YOUR_USER/universal-chat-ai/releases/latest/download/setup.sh | bash</div>
+    <b>Option 2: Manual</b><br>
+    Clone the repo and run:
+    <div class="code-block" onclick="copyCode(this)">git clone https://github.com/YOUR_USER/universal-chat-ai.git<br>cd universal-chat-ai<br>pip install -r requirements.txt<br>python server.py</div>
+    <b>Option 3: Windows</b>
+    <div class="code-block" onclick="copyCode(this)">pip install flask torch psutil pandas<br>python server.py</div>
+    Then <strong>refresh this page</strong> or click Retry below.
+  `;
+}
+
+function copyCode(el) {
+  const text = el.textContent;
+  navigator.clipboard.writeText(text).then(() => toast('Copied to clipboard'));
+}
+
+function retryConnect() {
+  checkBackend();
+}
+
+function continueOffline() {
+  document.getElementById('setup-screen').classList.add('hidden');
+  document.getElementById('chatMessages').innerHTML = '<div class="msg system">Offline mode. Run the desktop backend and reconnect in Settings.</div>';
+}
+
+function reconnect() {
+  localStorage.setItem('backendUrl', document.getElementById('backendUrl').value);
+  backendUrl = document.getElementById('backendUrl').value;
+  checkBackend();
+}
+
+// Chat
+const chatInput = document.getElementById('chatInput');
+chatInput.addEventListener('keydown', e => { if (e.key==='Enter'&&!e.shiftKey) { e.preventDefault(); send(); } });
+
+function escapeHtml(t){return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+function scrollChat() {
+  const el = document.getElementById('chatMessages');
+  el.scrollTop = el.scrollHeight;
+}
+
+async function send() {
+  if (generating || !connected) return;
+  const text = chatInput.value.trim();
+  if (!text) return;
+  chatInput.value = '';
+  const btn = document.getElementById('sendBtn');
+  btn.disabled = true;
+
+  state.messages.push({role:'user',content:text});
+  renderChat();
+  scrollChat();
+
+  const temp = parseFloat(document.getElementById('temp').value);
+  const topk = parseInt(document.getElementById('topk').value);
+  const maxlen = parseInt(document.getElementById('maxlen').value);
+
+  try {
+    const resp = await api('POST', '/api/generate', {
+      prompt: text, temperature: temp, top_k: topk, max_new: maxlen,
+      history: state.messages.slice(-6).map(m=>({role:m.role,content:m.content}))
+    });
+    state.messages.push({role:'assistant',content:resp.text});
+    renderChat();
+    scrollChat();
+    api('POST','/api/add_message',{role:'assistant',text:resp.text}).catch(()=>{});
+  } catch(e) {
+    state.messages.push({role:'assistant',content:'[error: '+e.message+']'});
+    renderChat();
+    scrollChat();
+  }
+  btn.disabled = false;
+  chatInput.focus();
+}
+
+function renderChat() {
+  const el = document.getElementById('chatMessages');
+  if (state.messages.length === 0) {
+    el.innerHTML = '<div class="msg system">Start a conversation below.</div>';
+    return;
+  }
+  el.innerHTML = state.messages.map(m =>
+    `<div class="msg ${m.role}">${escapeHtml(m.content)}</div>`
+  ).join('');
+}
+
+// Training
+async function toggleTrain() {
+  if (!connected) return;
+  const btn = document.getElementById('trainBtn');
+  if (state.trainRunning) {
+    await api('POST','/api/train',{action:'stop'});
+    state.trainRunning = false;
+    btn.textContent = '▶ Start Training';
+    clearInterval(trainPoll);
+    toast('Training stopped');
+    return;
+  }
+  const epochs = parseInt(document.getElementById('trainEpochs').value) || 20;
+  const resume = document.getElementById('trainResume').checked;
+  const modelSize = document.getElementById('trainModelSize').value;
+  btn.textContent = '⏳ Starting...';
+  btn.disabled = true;
+  const resp = await api('POST','/api/train',{action:'start',epochs,resume,model_size:modelSize});
+  if (resp.error) { toast('Error: '+resp.error); btn.textContent = '▶ Start Training'; btn.disabled = false; return; }
+  state.trainRunning = true;
+  btn.textContent = '⏹ Stop Training';
+  btn.disabled = false;
+  toast('Training started');
+  if (trainPoll) clearInterval(trainPoll);
+  trainPoll = setInterval(pollProgress, 1000);
+}
+
+async function pollProgress() {
+  try {
+    const resp = await api('GET','/api/progress');
+    updateTrainUI(resp);
+  } catch(e) {}
+}
+
+function updateTrainUI(data) {
+  if (!data) data = state;
+  const p = data.progress || {};
+  const running = data.running || state.trainRunning;
+  const btn = document.getElementById('trainBtn');
+  if (!running && state.trainRunning) {
+    state.trainRunning = false; btn.textContent = '▶ Start Training';
+    clearInterval(trainPoll); trainPoll = null;
+    loadStats();
+  }
+  document.getElementById('trainStatus').textContent = p.status==='training'?'🟢 Training...':p.status==='complete'?'✅ Complete':p.status==='error'?'❌ Error':'Idle';
+  document.getElementById('trainLoss').textContent = 'Loss: '+(p.loss||'--');
+  document.getElementById('statEpoch').textContent = (p.epoch||0)+'/'+(p.total_epochs||0);
+  document.getElementById('statLoss').textContent = p.best_loss||'--';
+  document.getElementById('statMsgs').textContent = p.messages_count||'--';
+  document.getElementById('statETA').textContent = p.eta||'--';
+  document.getElementById('trainFill').style.width = (p.percent||0)+'%';
+  if (p.status === 'complete') {
+    toast('Training complete! Best loss: '+p.best_loss);
+    state.trainRunning = false; btn.textContent = '▶ Start Training';
+    clearInterval(trainPoll); trainPoll = null;
+    loadStats();
+  }
+}
+
+// Extractors
+async function loadExtractors() {
+  if (!connected) return;
+  try {
+    const status = await api('GET','/api/status');
+    state.extractors = status.extractors || [];
+    renderExtractors();
+  } catch(e) {}
+}
+
+function renderExtractors() {
+  document.getElementById('extractorsContainer').innerHTML = state.extractors.map(ex =>
+    `<div class="extractor-item">
+      <div class="info">
+        <div class="name">${ex.name}</div>
+        <div class="desc">${ex.description||''}</div>
+      </div>
+      <div>
+        <span class="badge ${ex.available?'avail':''}">${ex.available?'Available':ex.platforms.join(', ')||'N/A'}</span>
+        ${ex.available && ex.has_extract ? '<button class="btn btn-primary btn-sm" onclick="runExtract(\''+ex.name+'\')" style="margin-left:6px">Extract</button>' : ''}
+      </div>
+    </div>`
+  ).join('');
+}
+
+async function runExtract(source) {
+  const btn = event.target;
+  btn.disabled = true; btn.textContent = '⏳...';
+  toast('Extracting '+source+'...');
+  try {
+    const resp = await api('POST','/api/extract',{source,sync:true});
+    if (resp.error) { toast('Error: '+resp.error); return; }
+    toast('Got '+resp.new+' new messages ('+resp.total+' total)');
+    loadStats();
+  } catch(e) { toast('Error: '+e.message); }
+  btn.disabled = false; btn.textContent = 'Extract';
+}
+
+async function runExtractAll() {
+  toast('Extracting all sources...');
+  try {
+    const resp = await api('POST','/api/extract',{source:'all',sync:true});
+    if (resp.error) { toast('Error: '+resp.error); return; }
+    toast('Got '+resp.new+' new messages ('+resp.total+' total)');
+    loadStats();
+  } catch(e) { toast('Error: '+e.message); }
+}
+
+// File import
+document.getElementById('fileDrop').addEventListener('dragover', e=>{e.preventDefault();e.currentTarget.classList.add('dragover')});
+document.getElementById('fileDrop').addEventListener('dragleave', e=>{e.currentTarget.classList.remove('dragover')});
+document.getElementById('fileDrop').addEventListener('drop', e=>{
+  e.preventDefault(); e.currentTarget.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) uploadFile(file);
+});
+document.getElementById('fileInput').addEventListener('change', e=>{
+  if (e.target.files[0]) uploadFile(e.target.files[0]);
+});
+
+async function uploadFile(file) {
+  const source = document.getElementById('importSource').value;
+  const fd = new FormData();
+  fd.append('file', file); fd.append('source', source);
+  toast('Importing '+file.name+'...');
+  try {
+    const r = await fetch(baseURL()+'/api/upload_import', {method:'POST',body:fd});
+    const resp = await r.json();
+    if (resp.error) { toast('Error: '+resp.error); return; }
+    document.getElementById('importResult').style.display = 'block';
+    document.getElementById('importResult').innerHTML = `✅ Imported <strong>${resp.imported}</strong> messages, <strong>${resp.new}</strong> new (${resp.total} total)`;
+    loadStats();
+  } catch(e) { toast('Error: '+e.message); }
+}
+
+async function uploadImport() { document.getElementById('fileInput').click(); }
+
+// Stats
+async function loadStats() {
+  if (!connected) return;
+  try {
+    const resp = await api('GET','/api/messages?limit=1');
+    const s = resp.stats || {};
+    document.getElementById('mTotal').textContent = s.total||0;
+    document.getElementById('mUser').textContent = s.user||0;
+    document.getElementById('mAssistant').textContent = s.assistant||0;
+    document.getElementById('mChars').textContent = (s.characters||0).toLocaleString();
+    document.getElementById('statMsgs').textContent = s.total||0;
+  } catch(e) {}
+}
+
+// Export
+async function exportData(fmt) {
+  if (!connected) return;
+  toast('Exporting...');
+  try {
+    const resp = await api('POST','/api/export',{format:fmt});
+    if (resp.ok) toast('Exported '+resp.count+' messages');
+    else toast('Error: '+resp.error);
+  } catch(e) { toast('Error: '+e.message); }
+}
+
+// Init
+async function initApp(status) {
+  state.trainRunning = status.train_running;
+  state.extractors = status.extractors || [];
+  if (status.messages > 0) {
+    state.messages.push({role:'system',content:`AI ready — ${status.messages} messages loaded. Processing on device.`});
+  } else {
+    state.messages.push({role:'system',content:'No messages yet. Extract or import to start.'});
+  }
+  renderChat();
+  loadStats();
+  renderExtractors();
+  updateTrainUI(status);
+  if (status.train_running) {
+    document.getElementById('trainBtn').textContent = '⏹ Stop Training';
+    trainPoll = setInterval(pollProgress, 1000);
+  }
+}
+
+// Register service worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(()=>{});
+}
+
+// Startup
+(async function() {
+  await checkBackend();
+})();
+</script>
+</body>
+</html>
