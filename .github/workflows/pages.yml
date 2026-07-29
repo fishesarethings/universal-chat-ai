@@ -23,6 +23,9 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
+      - name: Copy install.sh to web root
+        run: cp install.sh build/web/install.sh
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:

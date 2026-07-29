@@ -2,7 +2,7 @@
   "name": "Universal Chat AI",
   "short_name": "Chat AI",
   "description": "Train an AI on your messages and chat with it",
-  "start_url": "/",
+  "start_url": "/universal-chat-ai/",
   "display": "standalone",
   "background_color": "#0a0a1a",
   "theme_color": "#0a0a1a",

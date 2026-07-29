@@ -1,5 +1,5 @@
 const CACHE = 'chat-ai-v1';
-const PRECACHE_URLS = ['/', '/manifest.json'];
+const PRECACHE_URLS = ['./', 'manifest.json'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
