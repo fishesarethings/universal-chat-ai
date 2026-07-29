@@ -299,11 +299,9 @@ def open_browser():
 
 def main():
     port = int(os.environ.get("PORT", 8765))
-    # Remove old single-use flag — always check for new iMessages
-    flag = os.path.join(HERE, ".auto_extracted")
-    if os.path.exists(flag): os.remove(flag)
     if sys.platform == "darwin":
-        auto_extract_imessage()
+        # iMessages are read from device USB, not from Mac DB
+        pass
     load_model()
     if not os.path.exists(MESSAGES_FILE): _save_messages([])
     import socket
