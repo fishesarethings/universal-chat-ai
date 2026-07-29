@@ -326,13 +326,30 @@ def _parse_telegram_db(db_path):
     return messages
 
 
+def _is_encrypted(db_path):
+    """Check if a SQLite database is encrypted."""
+    try:
+        with open(db_path, 'rb') as f:
+            header = f.read(16)
+        return not header.startswith(b'SQLite format 3')
+    except:
+        return True
+
 def _generic_scan(db_path):
     """Scan ANY SQLite database for message-like data."""
     messages = []
+    if _is_encrypted(db_path):
+        print(f"    Skipping encrypted database: {os.path.basename(db_path)}")
+        return messages
     try:
         conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
         cur = conn.cursor()
-        tables = [r[0] for r in cur.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+        try:
+            tables = [r[0] for r in cur.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+        except sqlite3.DatabaseError:
+            print(f"    Cannot read database (maybe encrypted): {os.path.basename(db_path)}")
+            conn.close()
+            return []
         for table in tables:
             try:
                 cols = [r[1] for r in cur.execute(f"PRAGMA table_info(\"{table}\")").fetchall()]

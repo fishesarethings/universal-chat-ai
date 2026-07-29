@@ -374,7 +374,11 @@ def _generic_scan_db(cur, db_path):
     """Scan ANY SQLite database for message-like text."""
     messages = []
     try:
-        tables = [r[0] for r in cur.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+        try:
+            tables = [r[0] for r in cur.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+        except sqlite3.DatabaseError:
+            print(f"    Cannot read database (maybe encrypted): {os.path.basename(db_path)}")
+            return []
         for table in tables:
             try:
                 cols = [r[1] for r in cur.execute(f'PRAGMA table_info("{table}")').fetchall()]
