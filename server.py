@@ -55,6 +55,7 @@ def api_status():
         'messages': _count_messages(), 'train_running': train_running,
         'train_progress': train_progress, 'extraction_in_progress': extraction_in_progress,
         'version': '1.1.0', 'phone_detected': phone_detected,
+        'tools': {'libimobiledevice': bool(shutil.which('idevice_id')), 'adb': bool(shutil.which('adb'))},
     })
 
 @app.route("/api/generate", methods=["POST"])

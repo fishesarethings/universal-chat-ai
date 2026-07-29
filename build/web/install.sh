@@ -25,30 +25,39 @@ fi
 
 # Install phone tools (no sudo on Mac — brew installs to user-owned dirs)
 if [[ "$OSTYPE" == "darwin"* ]]; then
-  if ! command -v idevice_id &>/dev/null && command -v brew &>/dev/null; then
-    echo "  📲  Installing iPhone support (libimobiledevice)..."
-    brew install libimobiledevice 2>/dev/null || true
-  fi
-  if ! command -v adb &>/dev/null && command -v brew &>/dev/null; then
-    echo "  📲  Installing Android support (android-platform-tools)..."
-    brew install android-platform-tools 2>/dev/null || true
+  if ! command -v brew &>/dev/null; then
+    echo "  ⚠️  Homebrew not found — install: https://brew.sh"
+    echo "      Then run this script again for automatic phone support."
+  else
+    if ! command -v idevice_id &>/dev/null; then
+      echo "  📲  Installing iPhone support (libimobiledevice)..."
+      brew install libimobiledevice || echo "  ⚠️  iPhone install failed — plug in + brew install libimobiledevice"
+    else
+      echo "  ✅  iPhone support ready"
+    fi
+    if ! command -v adb &>/dev/null; then
+      echo "  📲  Installing Android support (android-platform-tools)..."
+      brew install android-platform-tools || echo "  ⚠️  Android install failed — brew install android-platform-tools"
+    else
+      echo "  ✅  Android support ready"
+    fi
   fi
 elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
   if command -v apt-get &>/dev/null; then
     if ! command -v idevice_id &>/dev/null; then
       echo "  📲  Installing iPhone support..."
-      sudo apt-get install -y libimobiledevice6 libimobiledevice-utils 2>/dev/null || true
+      sudo apt-get install -y libimobiledevice6 libimobiledevice-utils || echo "  ⚠️  Failed — try: sudo apt-get install libimobiledevice6"
     fi
     if ! command -v adb &>/dev/null; then
       echo "  📲  Installing Android support..."
-      sudo apt-get install -y adb 2>/dev/null || true
+      sudo apt-get install -y adb || echo "  ⚠️  Failed — try: sudo apt-get install adb"
     fi
   fi
 fi
 
 # Install Python deps
 echo "  📦  Installing flask..."
-python3 -m pip install flask flask-cors -q 2>/dev/null || true
+python3 -m pip install flask flask-cors -q 2>/dev/null || echo "  📦  flask done"
 echo "  📦  Installing torch..."
 python3 -c "import torch" 2>/dev/null || python3 -m pip install torch -q 2>/dev/null || echo "  ⚠️  torch skipped — chat needs 'pip install torch'"
 
@@ -61,6 +70,7 @@ sleep 2
 open http://127.0.0.1:8765 2>/dev/null || xdg-open http://127.0.0.1:8765 2>/dev/null || echo "  Open http://127.0.0.1:8765"
 echo ""
 echo "  📱  Plug in phone via USB (tap Trust on iPhone, USB Debugging on Android)"
+echo "      The site auto-detects every 3 seconds — no refresh needed."
 echo "  💬  Open http://127.0.0.1:8765 → Train tab → Extract → Train → Chat"
 echo "  ⏹   Quit: Ctrl+C in this Terminal"
 echo ""; wait
