@@ -37,7 +37,8 @@ python3 server.py &
 sleep 2
 open http://127.0.0.1:8765 2>/dev/null || xdg-open http://127.0.0.1:8765 2>/dev/null || echo "  Open http://127.0.0.1:8765"
 echo ""
-echo "  📱  Connect phone via USB"
-echo "  💬  Train tab → Extract → Train → Chat"
+echo "  📱  Connect iPhone (USB): brew install libimobiledevice && plug in + tap Trust"
+echo "  📱  Connect Android (USB): Settings → Developer Options → USB Debugging"
+echo "  💬  Open http://127.0.0.1:8765 → Train tab → Extract → Train → Chat"
 echo "  ⏹   Quit: Ctrl+C in this Terminal window"
 echo ""; wait
