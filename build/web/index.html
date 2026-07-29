@@ -134,33 +134,60 @@ function isMobile() { return /Mobi|Android|iPhone/i.test(navigator.userAgent); }
 
 function showSetup() {
   const host = window.location.hostname;
+  const ua = navigator.userAgent;
+  const isPhone = /iPhone|iPod/.test(ua);
+  const isAndroid = /Android/.test(ua);
+  const isMac = /Mac|Macintosh/.test(ua);
+  const isWindows = /Windows|Win64|Win32/.test(ua);
+
+  // Remote device (phone/tablet accessing from WiFi)
   if (host !== '127.0.0.1' && host !== 'localhost') {
-    // Phone/tablet accessing from another device
+    let msg = '';
+    if (isPhone) msg = 'This works with a <b>Mac</b> computer.';
+    else if (isAndroid) msg = 'This works with a <b>Mac</b> or <b>PC</b> computer.';
     document.getElementById('sContent').innerHTML = `
-      <div class="icon" style="font-size:36px;margin-bottom:8px">📱</div>
-      <p style="font-size:14px;color:var(--text);margin-bottom:4px">You're viewing from another device!</p>
-      <p style="font-size:13px;color:var(--text2);margin-bottom:12px">The app runs on your computer. Open this URL there:</p>
-      <code style="font-size:13px">http://${host}:5050</code>
-      <p style="font-size:11px;color:var(--text2);margin-top:8px">Or install the app on your computer and come back.</p>`;
+      <div class="icon" style="font-size:36px;margin-bottom:8px">💻</div>
+      <p style="font-size:14px;color:var(--text);margin-bottom:4px">Use a computer, not your phone.</p>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:12px">${msg} The app runs on your computer. Open this URL there:</p>
+      <code style="font-size:13px">http://${host}:5050</code>`;
     return;
   }
-  document.getElementById('sContent').innerHTML = `
-    <div class="icon" style="font-size:36px;margin-bottom:8px">📱</div>
-    <p style="font-size:13px;margin-bottom:12px">Run the app, plug in your phone, extract everything.</p>
-    <div class="step"><div class="num">1</div> Open Terminal in the app folder</div>
-    <div class="step"><div class="num">2</div> <code style="display:inline;font-size:12px;padding:4px 8px">python3 server.py</code></div>
-    <div class="step"><div class="num">3</div> Plug in iPhone or Android via USB</div>
-    <div class="step"><div class="num">4</div> Tap Extract → Train → Chat!</div>
-    <div style="margin-top:16px">
-      <button class="btn btn-primary" onclick="check()">🔄 I'm running it — Refresh</button>
-      <details style="margin-top:12px;text-align:left;font-size:12px;color:var(--text2)">
-        <summary style="cursor:pointer">Windows / Mac / install help</summary>
-        <p style="margin-top:8px"><b>Windows (Android only):</b></p>
-        <code style="font-size:11px">pip install flask torch<br>python server.py</code>
-        <p style="margin-top:8px"><b>Mac "damaged" error?</b></p>
-        <code style="font-size:11px">xattr -dr com.apple.quarantine Universal\ Chat\ AI.app</code>
-      </details>
-    </div>`;
+
+  let html = '';
+  if (isMac) {
+    html = `
+      <div class="icon" style="font-size:36px;margin-bottom:8px">💻</div>
+      <p style="font-size:13px;margin-bottom:12px">Mac detected. Plug in your phone.</p>
+      <div class="step"><div class="num">1</div> Open Terminal in app folder</div>
+      <div class="step"><div class="num">2</div> <code style="display:inline;font-size:12px;padding:4px 8px">python3 server.py</code></div>
+      <div class="step"><div class="num">3</div> Plug in iPhone or Android via USB</div>
+      <div class="step"><div class="num">4</div> Tap Extract → Train → Chat!</div>
+      <div style="margin-top:16px;text-align:left;font-size:12px;color:var(--text2);background:#1a1a2e;padding:10px;border-radius:8px">
+        <b>⚠️ "Damaged" / "Unidentified Developer"?</b><br>
+        Run in Terminal:<br>
+        <code style="font-size:10px;margin:4px 0">xattr -dr com.apple.quarantine Path/To/App</code><br>
+        Or right-click → Open instead of double-click.
+      </div>`;
+  } else if (isWindows) {
+    html = `
+      <div class="icon" style="font-size:36px;margin-bottom:8px">🪟</div>
+      <p style="font-size:13px;margin-bottom:12px">Windows detected. Android phones only.</p>
+      <div class="step"><div class="num">1</div> Open Command Prompt in app folder</div>
+      <div class="step"><div class="num">2</div> <code style="display:inline;font-size:12px;padding:4px 8px">pip install flask torch</code></div>
+      <div class="step"><div class="num">3</div> <code style="display:inline;font-size:12px;padding:4px 8px">python server.py</code></div>
+      <div class="step"><div class="num">4</div> Plug in Android via USB → Extract → Train → Chat!</div>
+      <div style="margin-top:12px;font-size:11px;color:var(--text2)">⚠️ iPhone requires a Mac (Windows not supported).</div>`;
+  } else {
+    html = `
+      <div class="icon" style="font-size:36px;margin-bottom:8px">💻</div>
+      <p style="font-size:13px;margin-bottom:12px">Run the app on your computer.</p>
+      <div class="step"><div class="num">1</div> Install Python 3</div>
+      <div class="step"><div class="num">2</div> <code style="display:inline;font-size:12px;padding:4px 8px">pip install flask torch</code></div>
+      <div class="step"><div class="num">3</div> <code style="display:inline;font-size:12px;padding:4px 8px">python server.py</code></div>
+      <div class="step"><div class="num">4</div> Plug in phone → Extract → Train → Chat!</div>`;
+  }
+  html += `<div style="margin-top:16px"><button class="btn btn-primary" onclick="check()">🔄 I'm running it — Refresh</button></div>`;
+  document.getElementById('sContent').innerHTML = html;
 }
 
 async function check() {
