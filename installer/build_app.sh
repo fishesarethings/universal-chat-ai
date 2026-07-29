@@ -24,9 +24,9 @@ on run
     
     -- Check if already running
     try
-        set isRunning to do shell script "lsof -ti:5050 2>/dev/null || echo ''"
+        set isRunning to do shell script "lsof -ti:8765 2>/dev/null || echo ''"
         if isRunning is not "" then
-            do shell script "open http://127.0.0.1:5050"
+            do shell script "open http://127.0.0.1:8765"
             display notification "Already running!" subtitle "Opening browser..." with title "Universal Chat AI"
             return
         end if
@@ -40,7 +40,7 @@ on run
     
     -- Wait for server, then open browser
     delay 2
-    do shell script "open http://127.0.0.1:5050"
+    do shell script "open http://127.0.0.1:8765"
     display notification "Server started!" subtitle "Open your browser" with title "Universal Chat AI"
 end
 '

@@ -267,11 +267,11 @@ def auto_extract_imessage():
     except: pass
 
 def open_browser():
-    try: webbrowser.open('http://127.0.0.1:5050')
+    try: webbrowser.open('http://127.0.0.1:8765')
     except: pass
 
 def main():
-    port = int(os.environ.get("PORT", 5050))
+    port = int(os.environ.get("PORT", 8765))
     if sys.platform == "darwin":
         flag = os.path.join(HERE, ".auto_extracted")
         if not os.path.exists(flag):
