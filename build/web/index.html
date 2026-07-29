@@ -68,6 +68,14 @@ select,input{background:#1e1e3a;color:var(--text);border:1px solid #333;padding:
       <b>iPhone:</b> Plug in via USB → tap <b>Trust</b> on your phone.<br>
       <b>Android:</b> Enable <b>USB Debugging</b> (Settings → Developer Options) → plug in.
     </div>
+    <div id="extractHelp" style="display:none;font-size:12px;color:#ff8;margin:6px 0;line-height:1.6;padding:8px;background:#1a1a2e;border-radius:8px">
+      <b>📱 iPhone backup tips:</b><br>
+      1. <b>Unlock</b> your phone and keep screen on<br>
+      2. If you see "Trust this computer?" → tap <b>Trust</b><br>
+      3. On iPhone, go to Settings → General → Transfer or Reset → enter passcode if asked<br>
+      4. Try unplugging and reconnecting the USB cable<br>
+      5. Then hit <b>Extract Messages</b> again
+    </div>
     <button class="btn btn-primary" id="extractBtn" onclick="extractPhone()" style="display:none;padding:14px">📲 Extract Messages</button>
     <div id="extractResult" style="font-size:13px;color:var(--text2);margin-top:6px"></div>
   </div>
@@ -175,14 +183,18 @@ function phoneDetected(d, t) {
 
 async function extractPhone() {
   if (!phoneInfo) return; document.getElementById('extractBtn').disabled = true;
-  document.getElementById('extractResult').textContent = '⏳ Reading...';
+  document.getElementById('extractResult').textContent = '⏳ Reading (keep phone unlocked)...';
+  document.getElementById('extractHelp').style.display = 'none';
   try {
     const r = await api('POST','/api/extract',{source:phoneInfo.source,udid:phoneInfo.udid,sync:true});
     document.getElementById('extractResult').textContent = '✅ Got '+r.new+' messages';
     document.getElementById('tMsgs').textContent = r.total+' msgs';
     document.getElementById('trainBtn').disabled = false; document.getElementById('trainCard').style.opacity = '1';
     document.getElementById('tStatus').textContent = 'Ready!';
-  } catch(e) { document.getElementById('extractResult').textContent = '❌ '+e.message; }
+  } catch(e) {
+    document.getElementById('extractResult').textContent = '❌ '+e.message;
+    document.getElementById('extractHelp').style.display = 'block';
+  }
   document.getElementById('extractBtn').disabled = false;
 }
 
