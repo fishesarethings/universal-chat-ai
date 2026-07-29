@@ -68,6 +68,13 @@ select,input{background:#1e1e3a;color:var(--text);border:1px solid #333;padding:
       <b>iPhone:</b> Plug in via USB → tap <b>Trust</b> on your phone.<br>
       <b>Android:</b> Enable <b>USB Debugging</b> (Settings → Developer Options) → plug in.
     </div>
+    <div id="androidHelp" style="display:none;font-size:12px;color:#8f8;margin:6px 0;line-height:1.6;padding:8px;background:#1a2e1a;border-radius:8px">
+      <b>🤖 Android tips:</b><br>
+      1. Keep screen on and unlocked<br>
+      2. If prompted, tap <b>Allow USB debugging</b><br>
+      3. SMS/MMS are extracted automatically (no root needed)<br>
+      4. WhatsApp/Signal etc. need <b>root</b> to access app data
+    </div>
     <div id="extractHelp" style="display:none;font-size:12px;color:#ff8;margin:6px 0;line-height:1.6;padding:8px;background:#1a1a2e;border-radius:8px">
       <b>📱 iPhone backup tips:</b><br>
       1. <b>Unlock</b> your phone and keep screen on<br>
@@ -178,14 +185,21 @@ async function check() {
 }
 
 function phoneDetected(d, t) {
-  phoneInfo = null; const btn = document.getElementById('extractBtn'); const help = document.getElementById('phoneHelp');
+  phoneInfo = null; const btn = document.getElementById('extractBtn'); const help = document.getElementById('phoneHelp'); const androidHelp = document.getElementById('androidHelp');
   let msg = '🔌 None';
-  let found = false;
+  let found = false; let isAndroid = false; let isiPhone = false;
   if (d) for (const [s,info] of Object.entries(d)) {
-    if (info.devices&&info.devices.length) { phoneInfo = {source:s,udid:info.devices[0].udid}; msg = '📱 '+info.devices[0].name+' ('+s+')'; btn.style.display = 'block'; found = true; }
+    if (info.devices&&info.devices.length) {
+      phoneInfo = {source:s,udid:info.devices[0].udid};
+      msg = '📱 '+info.devices[0].name+' ('+s+')';
+      btn.style.display = 'block'; found = true;
+      if (s.includes('Android')) isAndroid = true;
+      if (s.includes('iPhone')) isiPhone = true;
+    }
   }
   document.getElementById('phoneStatus').textContent = msg;
-  help.style.display = found ? 'none' : 'block';
+  help.style.display = (found && isiPhone) ? 'block' : 'none';
+  if (androidHelp) androidHelp.style.display = (found && isAndroid) ? 'block' : 'none';
 }
 
 let extractPollInterval = null;
