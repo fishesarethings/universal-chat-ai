@@ -98,7 +98,8 @@ def get_available_apps(udid):
     return apps
 
 
-def create_backup(udid, output_dir, apps=None):
+def create_backup(udid, output_dir, apps=None, progress_cb=None):
+    if progress_cb: progress_cb(0, "Starting backup...")
     print(f"  Creating iPhone backup (this may take a few minutes)...")
     print(f"  Keep your iPhone unlocked and screen on.")
 
@@ -106,37 +107,50 @@ def create_backup(udid, output_dir, apps=None):
     try:
         pair_check = subprocess.run(["idevicepair", "validate", "-u", udid], capture_output=True, text=True, timeout=10)
         if pair_check.returncode != 0:
+            if progress_cb: progress_cb(0, "❌ Phone not trusted. Tap Trust on your iPhone.")
             print(f"  ❌ Phone not trusted. Tap 'Trust' on your iPhone, then try again.")
             return None
     except:
         pass
 
+    if progress_cb: progress_cb(5, "Backing up messages...")
     try:
         cmd = ["idevicebackup2", "backup", output_dir]
         if udid:
             cmd.extend(["-u", udid])
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        last_pct = 5
+        for line in proc.stdout or []:
+            line = line.strip()
+            if not line: continue
+            # Try to parse percentage from lines like "10.0%" or "Backing up: 50%"
+            import re
+            m = re.search(r'(\d+\.?\d*)\s*%', line)
+            if m:
+                pct = int(float(m.group(1)))
+                pct = max(5, min(95, pct))  # clamp between 5-95%
+                if pct > last_pct:
+                    last_pct = pct
+                    if progress_cb: progress_cb(pct, f"Backing up... {pct}%")
+            # Check for errors
+            low = line.lower()
+            if "error" in low and ("lock" in low or "screen" in low or "trust" in low or "passcode" in low):
+                if progress_cb: progress_cb(last_pct, "❌ " + line)
+        proc.wait(timeout=300)
         manifest_path = os.path.join(output_dir, "Manifest.plist")
         if os.path.exists(manifest_path):
+            if progress_cb: progress_cb(100, "Backup complete!")
             with open(manifest_path, 'rb') as f:
                 manifest = plistlib.load(f)
             return manifest
         else:
-            # Check for common errors in output
-            out = (proc.stdout + " " + proc.stderr).lower()
-            if "device" in out and ("lock" in out or "screen" in out or "passcode" in out):
-                print(f"  ❌ Unlock your iPhone and keep screen on, then try again.")
-            elif "trust" in out:
-                print(f"  ❌ Tap 'Trust' on your iPhone, then try again.")
-            else:
-                print(f"  Backup created but no manifest found")
+            if progress_cb: progress_cb(last_pct, "❌ Backup incomplete (no manifest)")
             return None
     except subprocess.TimeoutExpired:
-        print(f"  ⏱️  Backup timed out (5 min). Keep phone unlocked and try again.")
-        print(f"  If it keeps failing, run: idevicebackup2 backup -u {udid} /tmp/backup")
+        if progress_cb: progress_cb(last_pct, "⏱️ Backup timed out (5 min). Keep phone unlocked and try again.")
         return None
     except Exception as e:
-        print(f"  Backup failed: {e}")
+        if progress_cb: progress_cb(last_pct, f"❌ {e}")
         return None
 
 
@@ -411,7 +425,7 @@ def _generic_scan(db_path):
     return messages
 
 
-def extract(udid=None, selected_apps=None, max_messages=None):
+def extract(udid=None, selected_apps=None, max_messages=None, progress_cb=None):
     if not is_installed():
         install_cmd = "brew install libimobiledevice" if sys.platform == "darwin" else "apt install libimobiledevice6"
         raise RuntimeError(f"libimobiledevice not found. Install: {install_cmd}")
@@ -424,6 +438,7 @@ def extract(udid=None, selected_apps=None, max_messages=None):
         udid = devices[0]['udid']
 
     print(f"  Connected: {devices[0]['name']} (iOS {devices[0].get('ios', '?')})")
+    if progress_cb: progress_cb(2, f"Connected: {devices[0]['name']}")
 
     if not selected_apps:
         selected_apps = list(EXTRACTABLE_FROM_BACKUP.keys())
@@ -431,10 +446,11 @@ def extract(udid=None, selected_apps=None, max_messages=None):
     backup_dir = tempfile.mkdtemp(prefix="iphone_backup_")
     all_messages = []
     try:
-        manifest = create_backup(udid, backup_dir)
+        manifest = create_backup(udid, backup_dir, progress_cb=progress_cb)
         if manifest is None:
             raise RuntimeError("Backup failed — unlock phone, tap Trust, then try again")
 
+        if progress_cb: progress_cb(95, "Reading messages...")
         for app_name in selected_apps:
             if app_name in EXTRACTABLE_FROM_BACKUP:
                 print(f"  Extracting {app_name}...")
@@ -447,6 +463,7 @@ def extract(udid=None, selected_apps=None, max_messages=None):
         if max_messages and len(all_messages) > max_messages:
             all_messages = all_messages[-max_messages:]
 
+        if progress_cb: progress_cb(100, f"Done! {len(all_messages)} messages found")
         return all_messages
 
     finally:

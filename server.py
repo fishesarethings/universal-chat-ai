@@ -12,6 +12,7 @@ model = None
 train_thread_obj = None
 train_running = False
 extraction_in_progress = False
+extraction_progress = {'status': 'idle', 'percent': 0, 'message': '', 'result': None}
 phone_detected = None
 phone_checking = False
 
@@ -84,19 +85,24 @@ def api_generate():
 
 @app.route("/api/extract", methods=["POST"])
 def api_extract():
-    global extraction_in_progress
+    global extraction_in_progress, extraction_progress
     data = request.json or {}
 
+    if extraction_in_progress:
+        return jsonify({"status": "already_running"})
+
     def do():
-        global extraction_in_progress
+        global extraction_in_progress, extraction_progress
         extraction_in_progress = True
+        extraction_progress.update(status='extracting', percent=0, message='Starting...', result=None)
         try:
             new_msgs = []
             source = data.get("source")
             if source and source in ('iPhone (USB)', 'Android (USB)'):
                 from extractors import extract_from
                 new_msgs = extract_from(source, udid=data.get("udid"),
-                    selected_apps=data.get("apps"), max_messages=data.get("max_messages"))
+                    selected_apps=data.get("apps"), max_messages=data.get("max_messages"),
+                    progress_cb=lambda p,m: extraction_progress.update(percent=p, message=m))
             elif source:
                 from extractors import extract_from
                 new_msgs = extract_from(source, max_messages=data.get("max_messages"))
@@ -109,16 +115,21 @@ def api_extract():
             all_msgs = existing + unique
             _save_messages(all_msgs)
             _rebuild_training_files(all_msgs)
-            return {'ok': True, 'new': len(unique), 'total': len(all_msgs)}
-        except Exception as e: raise e
-        finally: extraction_in_progress = False
+            result = {'ok': True, 'new': len(unique), 'total': len(all_msgs)}
+            extraction_progress.update(status='done', percent=100, message='Done!', result=result)
+            return result
+        except Exception as e:
+            extraction_progress.update(status='error', message=str(e), result={'error': str(e)})
+            raise e
+        finally:
+            extraction_in_progress = False
 
-    if data.get('sync'):
-        try: return jsonify(do())
-        except Exception as e: return jsonify({"error": str(e)}), 500
-    else:
-        threading.Thread(target=do, daemon=True).start()
-        return jsonify({"ok": True, "message": "Extracting..."})
+    def bg():
+        try: do()
+        except: pass
+
+    threading.Thread(target=bg, daemon=True).start()
+    return jsonify({"status": "started"})
 
 @app.route("/api/upload_import", methods=["POST"])
 def api_upload_import():
@@ -166,7 +177,7 @@ def api_train():
         return jsonify({"ok": True})
 
 @app.route("/api/progress")
-def api_progress(): return jsonify({'running': train_running, 'progress': train_progress})
+def api_progress(): return jsonify({'running': train_running, 'progress': train_progress, 'extraction': extraction_progress})
 
 @app.route("/api/messages")
 def api_messages():

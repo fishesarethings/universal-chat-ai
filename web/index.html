@@ -77,6 +77,10 @@ select,input{background:#1e1e3a;color:var(--text);border:1px solid #333;padding:
       5. Then hit <b>Extract Messages</b> again
     </div>
     <button class="btn btn-primary" id="extractBtn" onclick="extractPhone()" style="display:none;padding:14px">📲 Extract Messages</button>
+    <div id="extractProgress" style="display:none;margin:8px 0">
+      <div class="progress"><div class="fill" id="extractFill"></div></div>
+      <div id="extractMsg" style="font-size:12px;color:var(--text2);text-align:center"></div>
+    </div>
     <div id="extractResult" style="font-size:13px;color:var(--text2);margin-top:6px"></div>
   </div>
 
@@ -159,7 +163,6 @@ async function check() {
     if (s.messages) { document.getElementById('tMsgs').textContent = s.messages+' msgs'; document.getElementById('trainBtn').disabled = false; document.getElementById('trainCard').style.opacity = '1'; document.getElementById('tStatus').textContent = 'Ready!'; }
     if (s.train_running) { training = true; document.getElementById('trainBtn').textContent = '⏹ Stop'; setInterval(poll,1000); }
     if (s.model_loaded) document.getElementById('doneCard').style.display = 'block';
-    // tool status
     const ts = document.getElementById('toolStatus');
     const tools = s.tools||{}; const parts = [];
     if (tools.libimobiledevice) parts.push('✅ iPhone'); else parts.push('❌ iPhone');
@@ -167,6 +170,7 @@ async function check() {
     ts.textContent = parts.join(' | ');
     if (!tools.libimobiledevice && !tools.adb) ts.innerHTML = '❌ Need: <code style="font-size:10px;background:#1a1a2e;padding:2px 6px;border-radius:3px">brew install libimobiledevice android-platform-tools</code>';
     phoneDetected(s.phone_detected, tools);
+    if (s.extraction_in_progress) showExtractProgress();
   } catch(e) { showSetup(); document.getElementById('connStatus').textContent = '❌ Not connected'; }
 }
 
@@ -181,21 +185,50 @@ function phoneDetected(d, t) {
   help.style.display = found ? 'none' : 'block';
 }
 
-async function extractPhone() {
-  if (!phoneInfo) return; document.getElementById('extractBtn').disabled = true;
-  document.getElementById('extractResult').textContent = '⏳ Reading (keep phone unlocked)...';
-  document.getElementById('extractHelp').style.display = 'none';
+let extractPollInterval = null;
+function showExtractProgress() {
+  document.getElementById('extractProgress').style.display = 'block';
+  document.getElementById('extractBtn').disabled = true;
+  if (extractPollInterval) clearInterval(extractPollInterval);
+  extractPollInterval = setInterval(pollExtract, 1000);
+}
+async function pollExtract() {
   try {
-    const r = await api('POST','/api/extract',{source:phoneInfo.source,udid:phoneInfo.udid,sync:true});
-    document.getElementById('extractResult').textContent = '✅ Got '+r.new+' messages';
-    document.getElementById('tMsgs').textContent = r.total+' msgs';
-    document.getElementById('trainBtn').disabled = false; document.getElementById('trainCard').style.opacity = '1';
-    document.getElementById('tStatus').textContent = 'Ready!';
-  } catch(e) {
+    const p = await api('GET','/api/progress');
+    const e = p.extraction||{};
+    document.getElementById('extractFill').style.width = (e.percent||0)+'%';
+    document.getElementById('extractMsg').textContent = e.message||'Working...';
+    if (e.status==='done' && e.result) {
+      clearInterval(extractPollInterval); extractPollInterval = null;
+      document.getElementById('extractProgress').style.display = 'none';
+      document.getElementById('extractResult').textContent = '✅ Got '+e.result.new+' messages';
+      document.getElementById('tMsgs').textContent = e.result.total+' msgs';
+      document.getElementById('trainBtn').disabled = false; document.getElementById('trainCard').style.opacity = '1';
+      document.getElementById('tStatus').textContent = 'Ready!';
+      document.getElementById('extractBtn').disabled = false;
+    } else if (e.status==='error') {
+      clearInterval(extractPollInterval); extractPollInterval = null;
+      document.getElementById('extractProgress').style.display = 'none';
+      document.getElementById('extractResult').textContent = '❌ '+(e.result?.error||e.message);
+      document.getElementById('extractHelp').style.display = 'block';
+      document.getElementById('extractBtn').disabled = false;
+    }
+  } catch(ex) {}
+}
+
+async function extractPhone() {
+  if (!phoneInfo) return;
+  document.getElementById('extractResult').textContent = '';
+  document.getElementById('extractHelp').style.display = 'none';
+  showExtractProgress();
+  try { await api('POST','/api/extract',{source:phoneInfo.source,udid:phoneInfo.udid}); }
+  catch(e) {
+    clearInterval(extractPollInterval); extractPollInterval = null;
+    document.getElementById('extractProgress').style.display = 'none';
     document.getElementById('extractResult').textContent = '❌ '+e.message;
     document.getElementById('extractHelp').style.display = 'block';
+    document.getElementById('extractBtn').disabled = false;
   }
-  document.getElementById('extractBtn').disabled = false;
 }
 
 async function toggleTrain() {
