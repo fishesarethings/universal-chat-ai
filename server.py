@@ -272,15 +272,20 @@ def open_browser():
 
 def main():
     port = int(os.environ.get("PORT", 5050))
-    flag = os.path.join(HERE, ".auto_extracted")
-    if not os.path.exists(flag):
-        auto_extract_imessage()
-        try: open(flag,'w').close()
-        except: pass
+    if sys.platform == "darwin":
+        flag = os.path.join(HERE, ".auto_extracted")
+        if not os.path.exists(flag):
+            auto_extract_imessage()
+            try: open(flag,'w').close()
+            except: pass
     load_model()
     if not os.path.exists(MESSAGES_FILE): _save_messages([])
+    import socket
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.connect(("8.8.8.8", 80)); ip = s.getsockname()[0]; s.close()
+    except: ip = "YOUR_IP"
     if os.environ.get("OPEN_BROWSER","1")=="1": threading.Timer(1.5, open_browser).start()
-    print(f"\n  🧠  Universal Chat AI\n  ─────────────────────\n  ✅  Open: http://127.0.0.1:{port}\n  ⏹  Quit: Ctrl+C\n")
+    print(f"\n  🧠  Universal Chat AI\n  ─────────────────────\n  ✅  Desktop: http://127.0.0.1:{port}\n  📱  Phone:   http://{ip}:{port}\n  ⏹  Quit:    Ctrl+C\n")
     app.run(host=os.environ.get("HOST","0.0.0.0"), port=port, debug=False, threaded=True)
 
 if __name__ == "__main__": main()
