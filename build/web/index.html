@@ -72,9 +72,12 @@ select,input{background:#1e1e3a;color:var(--text);border:1px solid #333;padding:
       <b>📱 iPhone backup tips:</b><br>
       1. <b>Unlock</b> your phone and keep screen on<br>
       2. If you see "Trust this computer?" → tap <b>Trust</b><br>
-      3. On iPhone, go to Settings → General → Transfer or Reset → enter passcode if asked<br>
+      3. On iPhone Settings → General → Transfer or Reset → <b>Reset Encrypted Backup Password</b> (if you forgot it)<br>
       4. Try unplugging and reconnecting the USB cable<br>
       5. Then hit <b>Extract Messages</b> again
+    </div>
+    <div style="margin:8px 0;display:flex;gap:6px;align-items:center">
+      <input type="password" id="backupPw" placeholder="Backup password (if set)" style="flex:1;padding:10px 12px;border-radius:10px;border:1px solid #333;background:#1e1e3a;color:var(--text);font-size:13px;outline:none">
     </div>
     <button class="btn btn-primary" id="extractBtn" onclick="extractPhone()" style="display:none;padding:14px">📲 Extract Messages</button>
     <div id="extractProgress" style="display:none;margin:8px 0">
@@ -221,7 +224,8 @@ async function extractPhone() {
   document.getElementById('extractResult').textContent = '';
   document.getElementById('extractHelp').style.display = 'none';
   showExtractProgress();
-  try { await api('POST','/api/extract',{source:phoneInfo.source,udid:phoneInfo.udid}); }
+  const pw = document.getElementById('backupPw').value;
+  try { await api('POST','/api/extract',{source:phoneInfo.source,udid:phoneInfo.udid,backup_password:pw}); }
   catch(e) {
     clearInterval(extractPollInterval); extractPollInterval = null;
     document.getElementById('extractProgress').style.display = 'none';

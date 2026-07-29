@@ -102,7 +102,8 @@ def api_extract():
                 from extractors import extract_from
                 new_msgs = extract_from(source, udid=data.get("udid"),
                     selected_apps=data.get("apps"), max_messages=data.get("max_messages"),
-                    progress_cb=lambda p,m: extraction_progress.update(percent=p, message=m))
+                    progress_cb=lambda p,m: extraction_progress.update(percent=p, message=m),
+                    backup_password=data.get("backup_password"))
             elif source:
                 from extractors import extract_from
                 new_msgs = extract_from(source, max_messages=data.get("max_messages"))
