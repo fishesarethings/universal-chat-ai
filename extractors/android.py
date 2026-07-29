@@ -193,7 +193,7 @@ def get_available_apps(udid):
     return apps
 
 
-def extract(udid=None, selected_apps=None, max_messages=None):
+def extract(udid=None, selected_apps=None, max_messages=None, progress_cb=None):
     if not is_installed():
         install_cmd = "brew install android-platform-tools" if sys.platform == "darwin" else "apt install adb"
         raise RuntimeError(f"adb not found. Install: {install_cmd}")
@@ -206,17 +206,20 @@ def extract(udid=None, selected_apps=None, max_messages=None):
         udid = devices[0]['udid']
 
     print(f"  Connected: {devices[0]['name']} (Android {devices[0].get('android', '?')})")
+    if progress_cb: progress_cb(10, f"Connected: {devices[0]['name']}")
 
     root = has_root(udid)
     print(f"  Root access: {'Yes' if root else 'No'}")
+    if progress_cb: progress_cb(15, f"Root: {'Yes' if root else 'No'}")
 
     if not selected_apps:
         selected_apps = [name for name, config in ANDROID_APPS.items()
                          if not config.get('root_only', False) or root]
 
     all_messages = []
+    total_apps = len(selected_apps)
 
-    for app_name in selected_apps:
+    for i, app_name in enumerate(selected_apps):
         config = ANDROID_APPS.get(app_name)
         if not config:
             continue
@@ -225,6 +228,8 @@ def extract(udid=None, selected_apps=None, max_messages=None):
             print(f"  Skipping {app_name} (needs root)")
             continue
 
+        pct = 15 + int((i / max(total_apps, 1)) * 75)
+        if progress_cb: progress_cb(pct, f"Extracting {app_name}...")
         print(f"  Extracting {app_name}...")
         parser = config.get('parser', '')
 
@@ -245,6 +250,7 @@ def extract(udid=None, selected_apps=None, max_messages=None):
     if max_messages and len(all_messages) > max_messages:
         all_messages = all_messages[-max_messages:]
 
+    if progress_cb: progress_cb(100, f"Done! {len(all_messages)} messages from {len(selected_apps)} apps")
     return all_messages
 
 
