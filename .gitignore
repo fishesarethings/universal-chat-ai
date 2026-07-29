@@ -19,3 +19,5 @@ __pycache__/
 server.pid
 UPLOAD_*
 _upload_*
+installer/*.app/
+installer/*.zip
