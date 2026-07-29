@@ -193,7 +193,7 @@ def get_available_apps(udid):
     return apps
 
 
-def extract(udid=None, selected_apps=None, max_messages=None, progress_cb=None):
+def extract(udid=None, selected_apps=None, max_messages=None, progress_cb=None, backup_password=None):
     if not is_installed():
         install_cmd = "brew install android-platform-tools" if sys.platform == "darwin" else "apt install adb"
         raise RuntimeError(f"adb not found. Install: {install_cmd}")
