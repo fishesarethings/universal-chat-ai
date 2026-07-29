@@ -117,7 +117,11 @@ def api_extract():
             _save_messages(all_msgs)
             _rebuild_training_files(all_msgs)
             result = {'ok': True, 'new': len(unique), 'total': len(all_msgs)}
-            extraction_progress.update(status='done', percent=100, message='Done!', result=result)
+            # If the backup failed (error msg in progress), keep it as error
+            if len(new_msgs) == 0 and extraction_progress.get('message','').startswith('❌'):
+                extraction_progress.update(status='error', result={'error': extraction_progress['message']})
+            else:
+                extraction_progress.update(status='done', percent=100, message='Done!', result=result)
             return result
         except Exception as e:
             extraction_progress.update(status='error', message=str(e), result={'error': str(e)})
