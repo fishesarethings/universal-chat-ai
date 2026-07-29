@@ -108,36 +108,50 @@ def create_backup(udid, output_dir, apps=None, progress_cb=None):
     except Exception as e:
         print(f"  ⚠️ Pair check failed: {e}")
 
-    if progress_cb: progress_cb(5, "Checking backup service...")
-
-    # Quick check: can idevicebackup2 talk to the device at all?
-    try:
-        info_check = subprocess.run(["idevicebackup2", "info", output_dir, "-u", udid],
-                                    capture_output=True, text=True, timeout=15)
-        if info_check.returncode != 0:
-            err = (info_check.stderr or info_check.stdout or "").strip()[:300]
-            if "password" in err.lower():
-                msg = "❌ Go to Settings → General → Transfer or Reset → Reset Encrypted Backup Password"
-            else:
-                msg = f"❌ idevicebackup2: {err}"
-            if progress_cb: progress_cb(0, msg)
-            print(f"  {msg}")
-            return None
-        print(f"  Backup service OK: {info_check.stdout.strip()[:200]}")
-    except subprocess.TimeoutExpired:
-        print(f"  ⚠️ Info check timed out — continuing anyway")
-    except Exception as e:
-        print(f"  ⚠️ Info check failed: {e}")
-
-    if progress_cb: progress_cb(10, "Backing up messages...")
+    if progress_cb: progress_cb(5, "Backing up messages...")
 
     cmd = ["idevicebackup2", "backup", output_dir]
     if udid: cmd.extend(["-u", udid])
 
+    # Quick diagnostic: try a different temp dir to see if it instantly errors
+    if progress_cb: progress_cb(5, "Diagnosing...")
+    diag_dir = tempfile.mkdtemp(prefix="iphone_diag_")
+    try:
+        diag_cmd = ["idevicebackup2", "backup", diag_dir]
+        if udid: diag_cmd.extend(["-u", udid])
+        quick_check = subprocess.run(diag_cmd, capture_output=True, text=True, timeout=10, input="")
+        if quick_check.returncode != 0:
+            err = (quick_check.stderr or quick_check.stdout or "").strip()[:300]
+            low = err.lower()
+            if "password" in low and ("set" in low or "required" in low):
+                msg = "❌ Encrypted backup — go to Settings → General → Transfer or Reset → Reset Encrypted Backup Password"
+            elif "trust" in low:
+                msg = "❌ Tap 'Trust' on your iPhone, then try again"
+            elif "lock" in low or "passcode" in low:
+                msg = "❌ Unlock your iPhone and keep screen on"
+            else:
+                msg = f"❌ {err}"
+            if progress_cb: progress_cb(0, msg)
+            print(f"  {msg}")
+            return None
+        print(f"  Quick check OK")
+    except subprocess.TimeoutExpired:
+        print(f"  Backup started — proceeding with live progress")
+    except Exception as e:
+        print(f"  ℹ️  Diagnostics: {e}")
+    finally:
+        shutil.rmtree(diag_dir, ignore_errors=True)
+
+    if progress_cb: progress_cb(5, "Running backup...")
+
+    # Set backup password env var in case device prompts
+    env = os.environ.copy()
+    env["BACKUP_PASSWORD"] = ""
+
     master_fd, slave_fd = pty.openpty()
     try:
         proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=slave_fd,
-                                stderr=slave_fd, close_fds=True)
+                                stderr=slave_fd, close_fds=True, env=env)
     except Exception as e:
         os.close(master_fd); os.close(slave_fd)
         if progress_cb: progress_cb(0, f"❌ Failed to start: {e}")
@@ -148,7 +162,7 @@ def create_backup(udid, output_dir, apps=None, progress_cb=None):
     fcntl.fcntl(master_fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
 
     buf = b''
-    last_pct = 10
+    last_pct = 5
     start_time = time.time()
     last_output = start_time
     first_output_timeout = 20
@@ -160,7 +174,7 @@ def create_backup(udid, output_dir, apps=None, progress_cb=None):
         m = re.search(r'(\d+\.?\d*)\s*%', text)
         if m:
             pct = int(float(m.group(1)))
-            pct = max(10, min(95, pct))
+            pct = max(5, min(95, pct))
             if pct > last_pct:
                 last_pct = pct
                 if progress_cb: progress_cb(pct, f"Backing up... {pct}%")
@@ -213,8 +227,16 @@ def create_backup(udid, output_dir, apps=None, progress_cb=None):
                 proc.kill(); os.close(master_fd); return None
 
     proc.wait()
+    # Read any remaining output after process exits
+    try:
+        while True:
+            d = os.read(master_fd, 4096)
+            if not d: break
+            all_output += d.decode('utf-8', errors='replace')
+    except: pass
     os.close(master_fd)
 
+    return_code = proc.returncode
     manifest_path = os.path.join(output_dir, "Manifest.plist")
     if os.path.exists(manifest_path):
         if progress_cb: progress_cb(100, "Backup complete!")
@@ -222,10 +244,18 @@ def create_backup(udid, output_dir, apps=None, progress_cb=None):
             manifest = plistlib.load(f)
         return manifest
     else:
-        # Show all captured output for debugging
-        debug = all_output.strip()[:500]
-        print(f"  ⚠️ No manifest. idevicebackup2 output: {debug}")
-        if progress_cb: progress_cb(last_pct, f"❌ Backup failed: {debug or 'no output from idevicebackup2'}")
+        debug = all_output.strip()[:600]
+        print(f"  ⚠️ idevicebackup2 exit code={return_code}, output: {debug}")
+        if return_code != 0 and not debug:
+            # Try direct capture to see the error
+            try:
+                diag = subprocess.run(["idevicebackup2", "backup", output_dir, "-u", udid],
+                                      capture_output=True, text=True, timeout=15, input="")
+                debug = (diag.stderr or diag.stdout or "").strip()[:300]
+                print(f"  Direct capture: exit={diag.returncode}: {debug}")
+            except Exception as e:
+                debug = str(e)
+        if progress_cb: progress_cb(last_pct, f"❌ Backup failed: {debug or 'unknown error (try manual: idevicebackup2 backup ...)'}")
         return None
 
 
