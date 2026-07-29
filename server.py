@@ -506,19 +506,64 @@ def load_model():
         model = None
 
 
+def auto_extract_imessage():
+    try:
+        from extractors.imessage import is_available, extract
+        if is_available():
+            existing = _load_messages()
+            existing_texts = set(m.get('text', '') for m in existing)
+            new_msgs = extract()
+            unique = [m for m in new_msgs if m.get('text', '') not in existing_texts]
+            if unique:
+                all_msgs = existing + unique
+                _save_messages(all_msgs)
+                _rebuild_training_files(all_msgs)
+                print(f"  Auto-extracted {len(unique)} iMessage(s)")
+            else:
+                print(f"  iMessage: {len(existing)} already loaded")
+        else:
+            print(f"  iMessage not available on this system")
+    except Exception as e:
+        print(f"  iMessage auto-extract: {e}")
+
+
+def open_browser():
+    import webbrowser
+    try:
+        webbrowser.open('http://127.0.0.1:5050')
+    except:
+        pass
+
+
 def main():
     global training_log
     port = int(os.environ.get("PORT", 5050))
     host = os.environ.get("HOST", "0.0.0.0")
+
+    AUTO_EXTRACT_FLAG = os.path.join(HERE, ".auto_extracted")
+    if not os.path.exists(AUTO_EXTRACT_FLAG):
+        auto_extract_imessage()
+        try:
+            with open(AUTO_EXTRACT_FLAG, 'w') as f:
+                f.write('1')
+        except:
+            pass
+
     load_model()
     if not os.path.exists(MESSAGES_FILE):
         _save_messages([])
-    print(f"\n  Universal Chat AI")
-    print(f"  ───────────────")
-    print(f"  Server: http://{host}:{port}")
-    print(f"  Local:  http://127.0.0.1:{port}")
-    print(f"\n  On your phone, visit http://YOUR_COMPUTER_IP:{port}")
-    print(f"  Install as app: Safari -> Share -> Add to Home Screen\n")
+
+    auto_open = os.environ.get("OPEN_BROWSER", "1") == "1"
+    if auto_open:
+        threading.Timer(1.5, open_browser).start()
+
+    print(f"\n")
+    print(f"  🧠  Universal Chat AI")
+    print(f"  ─────────────────────")
+    print(f"  ✅  Open:  http://127.0.0.1:{port}")
+    print(f"  📱  Phone: http://YOUR_IP:{port}")
+    print(f"  ⏹  Quit:  Ctrl+C in this window\n")
+
     app.run(host=host, port=port, debug=False, threaded=True)
 
 

@@ -1,95 +1,64 @@
-# Universal Chat AI
+# 🧠 Universal Chat AI
 
-Train a personal AI on your messages from ANY messaging service and chat with it.
+An AI trained on **your** messages. Runs entirely on your computer — nothing leaves your device.
 
-Works on **Mac, Linux, Windows**. Access from **iPhone, Android, or any browser**.
+## 🚀 How to Use
 
-## Quick Start
+### Mac:
+1. Go to https://fishesarethings.github.io/universal-chat-ai
+2. Click "Download for Mac"
+3. Open the downloaded file
+4. Click "Start" in the Terminal window that opens
+5. Your browser opens — start chatting!
 
+**First time opening a downloaded app?**
+Right-click the app → Open (instead of double-click)
+
+### Windows / Linux:
 ```bash
-pip install flask torch psutil pandas
+pip install flask torch psutil pandas flask-cors
+python server.py
+```
+Then open http://127.0.0.1:5050
+
+### 📱 On your phone:
+Once running on your computer, visit `http://YOUR_COMPUTER_IP:5050` from your phone.
+Tap Share → Add to Home Screen (looks and works like a real app).
+
+---
+
+## What it does
+- Reads your iMessages (Mac only, stays on your computer)
+- Import chats from WhatsApp, Discord, Signal, Snapchat, Google Messages
+- Trains an AI that talks like you
+- Chat with it — it learns from your conversations
+- All processing stays **on your computer**
+
+## Importing chats
+Export your data from any app, then drag the file into the Import tab:
+- **WhatsApp**: Chat → Export Chat (without media)
+- **Discord**: Settings → Privacy & Safety → Request Data
+- **Google Messages**: https://takeout.google.com (select Messages)
+- **Snapchat**: Settings → My Data → Request
+- **Signal**: Signal Desktop → Preferences → Advanced → Export
+- **iMessage**: Automatic on Mac!
+
+## One-line install (Mac)
+Open Terminal and paste:
+```bash
+bash <(curl -s https://fishesarethings.github.io/universal-chat-ai/install.sh)
+```
+
+## Build from source
+```bash
+git clone https://github.com/fishesarethings/universal-chat-ai.git
+cd universal-chat-ai
+pip install -r requirements.txt
 python server.py
 ```
 
-Open `http://127.0.0.1:5050` in your browser.
-On your phone, visit `http://YOUR_COMPUTER_IP:5050` — tap Share → Add to Home Screen.
-
-## Supported Services
-
-| Service | How to Extract |
-|---------|---------------|
-| **iMessage** | Auto-detected on macOS (`~/Library/Messages/chat.db`) |
-| **Google Messages** | Upload Google Takeout JSON or SMS Backup & Restore XML |
-| **Discord** | Upload Discord Data Package (Request from Discord privacy settings) |
-| **Signal** | Auto-detected from Signal Desktop (Mac/Linux) or upload JSON export |
-| **WhatsApp** | Upload chat export .txt (Chat → Export Chat) |
-| **Snapchat** | Upload Snapchat My Data .zip (from snapchat.com settings) |
-| **Any service** | Upload JSON, CSV, TXT with auto-detection |
-
-## Features
-
-- **Chat interface** — Talk to your trained AI, PWA installable on phone
-- **Real-time progress** — See training loss, epoch, ETA update live
-- **Background service** — Run as LaunchAgent (Mac), systemd (Linux), or background process
-- **Multi-source** — Combine messages from all your services into one model
-- **Import/Export** — Upload files from any platform, export your data anytime
-
-## Background Mode
-
-```bash
-# Install as background service (auto-starts on login)
-python background.py install
-
-# Start/Stop manually
-python background.py start
-python background.py stop
-
-# View status or logs
-python background.py status
-python background.py logs
-
-# Remove background service
-python background.py uninstall
-
-# Run in foreground (for testing)
-python server.py
-```
-
-## Model Sizes
-
-| Size | Parameters | Speed | Quality |
-|------|-----------|-------|---------|
-| Tiny | ~1M | Fastest | Basic |
-| Small | ~4M | Fast | Good |
-| Medium | ~12M | Moderate | Better |
-| Large | ~25M | Slow | Best |
-
-## Getting Your Data
-
-### iMessage (macOS)
-Automatic extraction — just click "Extract" in the app.
-
-### Google Messages (Android)
-1. Go to https://takeout.google.com
-2. Deselect all, then select only "Messages"
-3. Download the export and upload the JSON file
-4. Or use SMS Backup & Restore app → export XML and upload
-
-### Discord
-1. Go to User Settings → Privacy & Safety
-2. Click "Request Data" under "Request all of my data"
-3. Download the package when ready, upload the ZIP
-
-### Signal
-- **Desktop**: If Signal Desktop is installed and synced, extraction is automatic
-- **Android**: Use Signal backup feature, convert to JSON
-
-### WhatsApp
-1. Open a chat → More options → Export chat
-2. Choose "Without media"
-3. Upload the generated .txt file
-
-### Snapchat
-1. Go to Snapchat settings → My Data
-2. Submit request, download ZIP
-3. Upload the ZIP file
+## Technical
+- Custom GPT model with BPE tokenizer
+- Built with Python, Flask, PyTorch
+- Static PWA frontend hosted on GitHub Pages
+- All data stays on-device

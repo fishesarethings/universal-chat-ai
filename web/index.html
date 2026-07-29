@@ -4,660 +4,310 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="manifest" href="/manifest.json">
-<meta name="description" content="Train a personal AI on your messages from any service. Processing happens on your device.">
+<link rel="manifest" href="manifest.json">
 <title>Universal Chat AI</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-:root{--bg:#0a0a1a;--surface:#141428;--surface2:#1e1e3a;--surface3:#2a2a4a;--primary:#00d4aa;--primary-dim:#00a888;--text:#e0e0f0;--text2:#8888aa;--danger:#ff4466;--radius:12px;--radius-sm:8px}
-body{font-family:-apple-system,'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);height:100dvh;display:flex;flex-direction:column;overflow:hidden;position:fixed;width:100%;top:0;left:0;overscroll-behavior:none}
-.safe-top{padding-top:env(safe-area-inset-top,0)}.safe-bottom{padding-bottom:env(safe-area-inset-bottom,0)}
+:root{--bg:#0a0a1a;--surface:#141428;--surface2:#1e1e3a;--primary:#00d4aa;--text:#e0e0f0;--text2:#8888aa;--radius:12px}
+body{font-family:-apple-system,system-ui,sans-serif;background:var(--bg);color:var(--text);height:100dvh;display:flex;flex-direction:column;overflow:hidden;position:fixed;width:100%}
 
 /* Setup screen */
-#setup-screen{position:fixed;inset:0;background:var(--bg);z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;overflow-y:auto}
-#setup-screen.hidden{display:none}
-#setup-screen .logo{font-size:48px;margin-bottom:12px}
-#setup-screen h1{font-size:22px;font-weight:700;margin-bottom:4px}
-#setup-screen .sub{color:var(--text2);font-size:14px;margin-bottom:20px;max-width:400px;line-height:1.5}
-#setup-screen .status-box{background:var(--surface);border-radius:var(--radius);padding:20px;max-width:420px;width:100%;border:1px solid var(--surface3)}
-#setup-screen .status-box .icon{font-size:32px;margin-bottom:8px}
-#setup-screen .status-box .msg{font-size:14px;color:var(--text2);margin-bottom:12px}
-#setup-screen .btn-wrap{display:flex;flex-direction:column;gap:8px;margin-top:16px;width:100%}
-#setup-screen .btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 20px;border-radius:var(--radius-sm);border:none;font-size:15px;font-weight:600;cursor:pointer;text-decoration:none;transition:.15s}
-#setup-screen .btn:active{transform:scale(.97)}
-#setup-screen .btn-primary{background:var(--primary);color:#0a0a1a}
-#setup-screen .btn-primary:hover{background:var(--primary-dim)}
-#setup-screen .btn-outline{background:transparent;border:1px solid var(--surface3);color:var(--text)}
-#setup-screen .btn-outline:hover{border-color:var(--primary)}
-#setup-screen .steps{max-width:420px;width:100%;margin-top:16px}
-#setup-screen .step{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--surface3);text-align:left;font-size:13px}
-#setup-screen .step:last-child{border-bottom:none}
-#setup-screen .step-num{width:24px;height:24px;border-radius:12px;background:var(--primary);color:#0a0a1a;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;margin-top:1px}
-#setup-screen .step-done .step-num{background:var(--primary)}
-#setup-screen .step-done .step-text{color:var(--primary)}
-#setup-screen .step-text{flex:1;line-height:1.4;color:var(--text2)}
-#setup-screen .step-text strong{color:var(--text)}
-#setup-screen .code-block{background:var(--surface2);border-radius:var(--radius-sm);padding:12px 16px;font-family:'SF Mono','Fira Code',monospace;font-size:13px;color:var(--primary);margin:8px 0;text-align:left;cursor:pointer}
-
-/* Tabs */
-.tabs{display:flex;background:var(--surface);border-bottom:1px solid var(--surface3);flex-shrink:0}
-.tab{flex:1;padding:10px 4px;text-align:center;font-size:12px;font-weight:500;color:var(--text2);cursor:pointer;transition:.2s;border-bottom:2px solid transparent;-webkit-user-select:none;user-select:none}
-.tab.active{color:var(--primary);border-bottom-color:var(--primary)}
-.tab .icon{font-size:18px;display:block;margin-bottom:1px}
-
-#chat-tab{flex:1;display:flex;flex-direction:column;min-height:0}
-.chat-messages{flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:6px;-webkit-overflow-scrolling:touch}
-.msg{max-width:88%;padding:10px 14px;border-radius:18px;font-size:15px;line-height:1.45;word-wrap:break-word;animation:fadeIn .2s}
-@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
-.msg.user{align-self:flex-end;background:var(--primary);color:#0a0a1a;border-bottom-right-radius:4px}
-.msg.assistant{align-self:flex-start;background:var(--surface2);color:var(--text);border-bottom-left-radius:4px}
-.msg.system{align-self:center;background:transparent;color:var(--text2);font-size:12px;max-width:100%;text-align:center;padding:4px 8px}
-.chat-input{display:flex;gap:8px;padding:10px 12px;background:var(--surface);border-top:1px solid var(--surface3);flex-shrink:0}
-.chat-input input{flex:1;padding:12px 16px;border-radius:24px;border:1px solid var(--surface3);background:var(--surface2);color:var(--text);font-size:15px;outline:none;min-width:0}
-.chat-input input:focus{border-color:var(--primary)}
-.chat-input button{padding:12px 20px;border-radius:24px;border:none;background:var(--primary);color:#0a0a1a;font-size:14px;font-weight:600;cursor:pointer;transition:.15s;flex-shrink:0}
-.chat-input button:disabled{opacity:.4;cursor:not-allowed}
-
-#train-tab{flex:1;display:none;flex-direction:column;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch}
-.card{background:var(--surface);border-radius:var(--radius);padding:16px;margin-bottom:12px;border:1px solid var(--surface3)}
-.card h3{font-size:13px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
-.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.stat{background:var(--surface2);border-radius:var(--radius-sm);padding:12px;text-align:center}
-.stat .val{font-size:20px;font-weight:700;color:var(--primary)}
-.stat .lbl{font-size:11px;color:var(--text2);margin-top:2px}
-.progress-bar{height:8px;background:var(--surface3);border-radius:4px;overflow:hidden;margin:10px 0}
-.progress-bar .fill{height:100%;background:linear-gradient(90deg,var(--primary),#00ffcc);border-radius:4px;transition:width .3s ease;width:0%}
-.train-status{display:flex;justify-content:space-between;font-size:13px;color:var(--text2);margin-bottom:4px}
-.train-status .loss{color:var(--primary);font-weight:600}
-
-#extract-tab{flex:1;display:none;flex-direction:column;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch}
-.extractor-item{background:var(--surface);border-radius:var(--radius-sm);padding:14px;margin-bottom:8px;border:1px solid var(--surface3);display:flex;justify-content:space-between;align-items:center}
-.extractor-item .info{flex:1;min-width:0}
-.extractor-item .name{font-weight:600;font-size:14px}
-.extractor-item .desc{font-size:12px;color:var(--text2);margin-top:2px}
-.extractor-item .badge{font-size:11px;padding:3px 8px;border-radius:10px;background:var(--surface3);color:var(--text2)}
-.extractor-item .badge.avail{background:var(--primary);color:#0a0a1a}
-.btn{display:inline-flex;align-items:center;gap:4px;padding:8px 16px;border-radius:var(--radius-sm);border:none;font-size:13px;font-weight:500;cursor:pointer;transition:.15s}
-.btn:active{transform:scale(.96)}
+#setup{position:fixed;inset:0;background:var(--bg);z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center}
+#setup.hidden{display:none}
+#setup .emoji{font-size:56px;margin-bottom:8px}
+#setup h1{font-size:24px;font-weight:700;margin-bottom:4px}
+#setup p{color:var(--text2);font-size:14px;margin-bottom:20px;max-width:360px;line-height:1.5}
+#setup .box{background:var(--surface);border-radius:var(--radius);padding:24px;max-width:380px;width:100%}
+#setup .box .big{font-size:40px;margin-bottom:8px}
+#setup .box .msg{font-size:14px;color:var(--text2);margin-bottom:16px;line-height:1.5}
+.btn{display:block;width:100%;padding:14px;border-radius:10px;border:none;font-size:16px;font-weight:600;cursor:pointer;text-align:center;text-decoration:none;margin-bottom:8px}
 .btn-primary{background:var(--primary);color:#0a0a1a}
-.btn-primary:hover{background:var(--primary-dim)}
-.btn-outline{background:transparent;border:1px solid var(--surface3);color:var(--text);padding:7px 15px}
-.btn-outline:hover{border-color:var(--primary);color:var(--primary)}
-.btn-danger{background:var(--danger);color:#fff}
-.btn-sm{padding:5px 10px;font-size:12px}
-.btn-block{width:100%;justify-content:center}
+.btn-outline{background:transparent;border:1px solid #333;color:var(--text)}
+.btn:active{opacity:.7}
+#setup code{display:block;background:#1a1a2e;padding:10px 14px;border-radius:8px;font-size:12px;color:var(--primary);margin:8px 0;text-align:left;line-height:1.8}
 
-#services-tab{flex:1;display:none;flex-direction:column;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch}
-.file-drop{background:var(--surface);border:2px dashed var(--surface3);border-radius:var(--radius);padding:30px 20px;text-align:center;margin-bottom:12px;transition:.2s;cursor:pointer}
-.file-drop.dragover{border-color:var(--primary);background:var(--surface2)}
-.file-drop .icon{font-size:32px;margin-bottom:4px}
-.file-drop .hint{font-size:13px;color:var(--text2)}
-.source-select{width:100%;padding:10px 12px;border-radius:var(--radius-sm);border:1px solid var(--surface3);background:var(--surface2);color:var(--text);font-size:14px;margin-bottom:10px;outline:none}
-.source-select:focus{border-color:var(--primary)}
+/* Main app */
+.tabs{display:flex;background:var(--surface);flex-shrink:0;padding-bottom:env(safe-area-inset-bottom,0)}
+.tab{flex:1;padding:10px 4px;text-align:center;font-size:11px;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent}
+.tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+.tab .icon{font-size:20px;display:block;margin-bottom:1px}
 
-#settings-tab{flex:1;display:none;flex-direction:column;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch}
-.setting-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--surface3)}
-.setting-row:last-child{border-bottom:none}
-.setting-row .lbl{font-size:14px}
-.setting-row .desc{font-size:12px;color:var(--text2);margin-top:2px}
-input[type=range]{-webkit-appearance:none;appearance:none;width:100px;height:4px;border-radius:2px;background:var(--surface3);outline:none}
-input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;border-radius:50%;background:var(--primary);cursor:pointer}
-input[type=number],input[type=text]{padding:6px 10px;border-radius:var(--radius-sm);border:1px solid var(--surface3);background:var(--surface2);color:var(--text);font-size:13px;width:70px;outline:none}
-input[type=number]:focus,input[type=text]:focus{border-color:var(--primary)}
-select{background:var(--surface2);color:var(--text);border:1px solid var(--surface3);padding:6px 10px;border-radius:var(--radius-sm);font-size:13px;outline:none}
-.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--surface2);color:var(--text);padding:10px 20px;border-radius:var(--radius);font-size:13px;z-index:100;border:1px solid var(--surface3);opacity:0;transition:.3s;pointer-events:none;white-space:nowrap}
-.toast.show{opacity:1}
-.import-result{margin-top:8px;padding:10px;border-radius:var(--radius-sm);background:var(--surface2);font-size:13px;color:var(--text2);display:none}
+/* Chat */
+#chat{flex:1;display:flex;flex-direction:column;min-height:0}
+.msgs{flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:6px;-webkit-overflow-scrolling:touch}
+.msg{max-width:85%;padding:10px 14px;border-radius:16px;font-size:15px;line-height:1.45;word-wrap:break-word;animation:fade .2s}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.msg.me{align-self:flex-end;background:var(--primary);color:#0a0a1a;border-bottom-right-radius:4px}
+.msg.ai{align-self:flex-start;background:var(--surface2);color:var(--text);border-bottom-left-radius:4px}
+.msg.info{align-self:center;color:var(--text2);font-size:12px;text-align:center;max-width:100%;padding:4px}
+.bar{display:flex;gap:8px;padding:10px 12px;background:var(--surface);border-top:1px solid #222;flex-shrink:0}
+.bar input{flex:1;padding:12px 16px;border-radius:24px;border:1px solid #333;background:var(--surface2);color:var(--text);font-size:15px;outline:none}
+.bar input:focus{border-color:var(--primary)}
+.bar button{padding:12px 24px;border-radius:24px;border:none;background:var(--primary);color:#0a0a1a;font-size:14px;font-weight:600;cursor:pointer}
+.bar button:disabled{opacity:.4}
+
+/* Train tab */
+#train{flex:1;display:none;flex-direction:column;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch}
+.card{background:var(--surface);border-radius:var(--radius);padding:16px;margin-bottom:12px}
+.card h3{font-size:12px;color:var(--text2);text-transform:uppercase;margin-bottom:10px}
+.row{display:flex;justify-content:space-between;padding:8px 0;font-size:14px}
+.row .val{font-weight:600;color:var(--primary)}
+.progress{height:8px;background:#222;border-radius:4px;overflow:hidden;margin:10px 0}
+.progress .fill{height:100%;background:var(--primary);width:0%;transition:width .3s}
+select,input{background:#1e1e3a;color:var(--text);border:1px solid #333;padding:8px 12px;border-radius:8px;font-size:14px;outline:none}
+
+/* Import tab */
+#import-tab{flex:1;display:none;flex-direction:column;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch}
+.drop{background:var(--surface);border:2px dashed #333;border-radius:var(--radius);padding:40px 20px;text-align:center;margin-bottom:12px;cursor:pointer}
+.drop.dragover{border-color:var(--primary);background:var(--surface2)}
+.drop .icon{font-size:40px;margin-bottom:4px}
+.drop .hint{font-size:13px;color:var(--text2)}
+
+/* Settings tab */
+#settings{flex:1;display:none;flex-direction:column;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch}
+.toggle{display:flex;gap:8px;margin-bottom:12px}
+.toggle button{flex:1;padding:12px;border-radius:10px;border:1px solid #333;background:transparent;color:var(--text2);font-size:13px;cursor:pointer}
+.toggle button.active{background:var(--primary);color:#0a0a1a;border-color:var(--primary);font-weight:600}
 </style>
 </head>
 <body>
 
-<div id="setup-screen">
-  <div class="logo">🧠</div>
+<!-- Setup Screen -->
+<div id="setup">
+  <div class="emoji">🧠</div>
   <h1>Universal Chat AI</h1>
-  <div class="sub">Train a personal AI on your messages from any messaging service. All processing happens on <strong>your device</strong>.</div>
-  <div class="status-box" id="setupStatus">
-    <div class="icon" id="setupIcon">🔍</div>
-    <div class="msg" id="setupMsg">Looking for local backend...</div>
-    <div class="steps" id="setupSteps">
-      <div class="step" id="step1">
-        <div class="step-num">1</div>
-        <div class="step-text"><strong>Download</strong> the desktop backend for your platform</div>
-      </div>
-      <div class="step" id="step2">
-        <div class="step-num">2</div>
-        <div class="step-text">Run this in your terminal:</div>
-      </div>
-      <div class="step" id="step3">
-        <div class="step-num">3</div>
-        <div class="step-text">Open <strong>http://127.0.0.1:5050</strong> or refresh this page</div>
-      </div>
-    </div>
-    <div class="btn-wrap" id="setupButtons" style="display:none">
-      <a class="btn btn-primary" id="downloadBtn" href="#">⬇ Download Desktop Backend</a>
-      <button class="btn btn-outline" onclick="retryConnect()">🔄 Retry Connection</button>
-      <button class="btn btn-outline" onclick="continueOffline()">Continue without backend</button>
-    </div>
+  <p>An AI trained on your messages that runs entirely on your computer. Nothing leaves your device.</p>
+  <div class="box" id="setupBox">
+    <div class="big" id="setupIcon">🔍</div>
+    <div class="msg" id="setupMsg">Looking for the app on your computer...</div>
+    <div id="setupActions"></div>
   </div>
 </div>
 
-<div class="tabs safe-top" id="tabs">
+<!-- Tabs -->
+<div class="tabs">
   <div class="tab active" data-tab="chat"><span class="icon">💬</span>Chat</div>
   <div class="tab" data-tab="train"><span class="icon">🧠</span>Train</div>
-  <div class="tab" data-tab="extract"><span class="icon">📥</span>Extract</div>
-  <div class="tab" data-tab="services"><span class="icon">📤</span>Import</div>
+  <div class="tab" data-tab="import"><span class="icon">📤</span>Import</div>
   <div class="tab" data-tab="settings"><span class="icon">⚙️</span>Settings</div>
 </div>
 
-<div id="chat-tab">
-  <div class="chat-messages" id="chatMessages">
-    <div class="msg system">Loading...</div>
-  </div>
-  <div class="chat-input safe-bottom" style="display:none" id="chatInputArea">
-    <input type="text" id="chatInput" placeholder="Type a message..." autocomplete="off">
-    <button id="sendBtn" onclick="send()">Send</button>
-  </div>
-  <div class="chat-messages" id="chatDisabledMsg" style="display:none;justify-content:center;align-items:center">
-    <div class="msg system">Backend not connected. Run the desktop backend and refresh.</div>
+<!-- Chat -->
+<div id="chat">
+  <div class="msgs" id="msgs"><div class="msg info">Start chatting below.</div></div>
+  <div class="bar" id="bar">
+    <input id="input" placeholder="Type a message..." autocomplete="off">
+    <button id="send" onclick="send()">Send</button>
   </div>
 </div>
 
-<div id="train-tab">
+<!-- Train -->
+<div id="train">
   <div class="card">
-    <h3>Training Progress</h3>
-    <div class="train-status"><span id="trainStatus">Idle</span><span class="loss" id="trainLoss">Loss: --</span></div>
-    <div class="progress-bar"><div class="fill" id="trainFill"></div></div>
-    <div class="stat-grid">
-      <div class="stat"><div class="val" id="statEpoch">0/0</div><div class="lbl">Epoch</div></div>
-      <div class="stat"><div class="val" id="statLoss">--</div><div class="lbl">Best Loss</div></div>
-      <div class="stat"><div class="val" id="statMsgs">0</div><div class="lbl">Messages</div></div>
-      <div class="stat"><div class="val" id="statETA">--</div><div class="lbl">ETA</div></div>
-    </div>
+    <h3>Your AI's Training</h3>
+    <div class="progress"><div class="fill" id="fill"></div></div>
+    <div class="row"><span>Status</span><span class="val" id="tStatus">Idle</span></div>
+    <div class="row"><span>Messages</span><span class="val" id="tMsgs">0</span></div>
+    <div class="row"><span>Progress</span><span class="val" id="tEpoch">--</span></div>
+    <div class="row"><span>Loss</span><span class="val" id="tLoss">--</span></div>
+    <div class="row"><span>ETA</span><span class="val" id="tETA">--</span></div>
   </div>
-  <div class="card">
-    <h3>Training Controls</h3>
-    <div style="display:flex;flex-direction:column;gap:10px">
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <select id="trainModelSize" style="flex:1;min-width:80px">
-          <option value="tiny">Tiny (fast)</option>
-          <option value="small" selected>Small</option>
-          <option value="medium">Medium</option>
-          <option value="large">Large (slow)</option>
-        </select>
-        <input type="number" id="trainEpochs" value="20" min="1" max="500" style="width:60px">
-        <label style="font-size:12px;display:flex;align-items:center;gap:4px;color:var(--text2)"><input type="checkbox" id="trainResume"> Resume</label>
-      </div>
-      <button class="btn btn-primary btn-block" id="trainBtn" onclick="toggleTrain()" disabled>▶ Start Training</button>
-    </div>
-  </div>
-</div>
-
-<div id="extract-tab">
-  <div class="card" id="extractorsList">
-    <h3>Message Sources</h3>
-    <div id="extractorsContainer"></div>
-    <button class="btn btn-primary btn-block" onclick="runExtractAll()" style="margin-top:10px">📥 Extract from All Available</button>
-  </div>
-</div>
-
-<div id="services-tab">
-  <div class="card">
-    <h3>Import Messages from File</h3>
-    <div class="file-drop" id="fileDrop" onclick="document.getElementById('fileInput').click()">
-      <div class="icon">📁</div>
-      <div class="hint">Drop a file here or tap to browse</div>
-    </div>
-    <input type="file" id="fileInput" accept=".json,.txt,.csv,.xml,.zip,.ndjson,.jsonl" style="display:none">
-    <select class="source-select" id="importSource">
-      <option value="Generic Import">Auto-detect format</option>
-      <option value="Google Messages">Google Messages / SMS Backup</option>
-      <option value="iMessage">iMessage</option>
-      <option value="Discord">Discord Data Package</option>
-      <option value="Signal">Signal</option>
-      <option value="WhatsApp">WhatsApp Export</option>
-      <option value="Snapchat">Snapchat My Data</option>
+  <button class="btn btn-primary" id="trainBtn" onclick="toggleTrain()">▶ Start Training</button>
+  <div style="display:flex;gap:8px;margin-top:12px">
+    <select id="modelSize" style="flex:1">
+      <option value="tiny">Tiny (fast)</option>
+      <option value="small" selected>Small (recommended)</option>
+      <option value="medium">Medium</option>
     </select>
-    <button class="btn btn-primary btn-block" onclick="uploadImport()">📤 Import File</button>
-    <div class="import-result" id="importResult"></div>
-  </div>
-  <div class="card">
-    <h3>Message Stats</h3>
-    <div class="stat-grid" id="statsGrid">
-      <div class="stat"><div class="val" id="mTotal">0</div><div class="lbl">Total</div></div>
-      <div class="stat"><div class="val" id="mUser">0</div><div class="lbl">Received</div></div>
-      <div class="stat"><div class="val" id="mAssistant">0</div><div class="lbl">Sent</div></div>
-      <div class="stat"><div class="val" id="mChars">0</div><div class="lbl">Characters</div></div>
-    </div>
-    <div style="margin-top:12px;display:flex;gap:8px">
-      <button class="btn btn-outline btn-block btn-sm" onclick="exportData('json')">Export JSON</button>
-      <button class="btn btn-outline btn-block btn-sm" onclick="exportData('formatted')">Export Train</button>
-    </div>
+    <select id="epochs" style="width:80px">
+      <option>10</option><option selected>20</option><option>50</option><option>100</option>
+    </select>
   </div>
 </div>
 
-<div id="settings-tab">
+<!-- Import -->
+<div id="import-tab">
+  <div class="drop" id="drop" onclick="document.getElementById('file').click()">
+    <div class="icon">📁</div>
+    <div class="hint">Drop a chat export file here, or tap to browse</div>
+  </div>
+  <input type="file" id="file" accept=".json,.txt,.csv,.zip" style="display:none">
+  <select id="source" style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1e1e3a;color:var(--text);margin-bottom:8px;font-size:14px">
+    <option value="Generic Import">Auto-detect format</option>
+    <option value="Google Messages">Google Messages (Takeout)</option>
+    <option value="Discord">Discord Data</option>
+    <option value="Signal">Signal</option>
+    <option value="WhatsApp">WhatsApp Export</option>
+    <option value="Snapchat">Snapchat My Data</option>
+  </select>
+  <button class="btn btn-primary" onclick="document.getElementById('file').click()">📤 Import Messages</button>
+  <div id="importResult" style="margin-top:8px;font-size:13px;color:var(--text2);display:none"></div>
+  <div class="card" style="margin-top:12px">
+    <h3>Message Stats</h3>
+    <div class="row"><span>Total</span><span class="val" id="mTotal">0</span></div>
+    <div class="row"><span>You sent</span><span class="val" id="mSent">0</span></div>
+    <div class="row"><span>You received</span><span class="val" id="mReceived">0</span></div>
+  </div>
+</div>
+
+<!-- Settings -->
+<div id="settings">
+  <div class="toggle" id="modeToggle">
+    <button class="active" onclick="setMode('chat')">💬 Chat</button>
+    <button onclick="setMode('train')">🧠 Train</button>
+  </div>
   <div class="card">
-    <h3>Generation</h3>
-    <div class="setting-row">
-      <div><div class="lbl">Temperature</div><div class="desc">Creativity (0.1-1.5)</div></div>
-      <span><span id="tempVal">0.9</span> <input type="range" id="temp" min="0.1" max="1.5" step="0.1" value="0.9" oninput="tempVal.textContent=this.value"></span>
-    </div>
-    <div class="setting-row">
-      <div><div class="lbl">Top-K</div><div class="desc">Word variety</div></div>
-      <input type="number" id="topk" value="50" min="1" max="200">
-    </div>
-    <div class="setting-row">
-      <div><div class="lbl">Max Tokens</div><div class="desc">Response length</div></div>
-      <input type="number" id="maxlen" value="100" min="10" max="500">
-    </div>
+    <h3>Response Settings</h3>
+    <div class="row"><span>Creativity</span><span><span id="tempVal">0.8</span> <input type="range" id="temp" min="0.1" max="1.5" step="0.1" value="0.8" oninput="tempVal.textContent=this.value" style="width:80px"></span></div>
+    <div class="row"><span>Max length</span><span><select id="maxlen" style="width:70px"><option>50</option><option selected>100</option><option>200</option><option>400</option></select></span></div>
   </div>
   <div class="card">
     <h3>Connection</h3>
-    <div class="setting-row">
-      <div><div class="lbl">Backend</div><div class="desc">Local processing server</div></div>
-      <span id="connStatus" style="font-size:13px;color:var(--text2)">Checking...</span>
-    </div>
-    <div class="setting-row">
-      <div><div class="lbl">Backend Address</div><div class="desc">Change if using a different port</div></div>
-      <input type="text" id="backendUrl" value="http://127.0.0.1:5050" style="width:160px">
-    </div>
-    <button class="btn btn-outline btn-block btn-sm" onclick="reconnect()">🔄 Reconnect</button>
+    <div class="row"><span>Server</span><span class="val" id="connStatus">Checking...</span></div>
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
-
 <script>
-const API_BACKEND = ''; // empty = detect
+const BACKEND = 'http://127.0.0.1:5050';
+let connected = false, training = false, generating = false, messages = [];
 
-let backendUrl = localStorage.getItem('backendUrl') || 'http://127.0.0.1:5050';
-let connected = false;
-let state = {messages:[],stats:{},extractors:[],trainRunning:false};
-let trainPoll = null;
-let generating = false;
-
-function log(...args) { console.log('[UAI]', ...args); }
-
-function toast(msg) {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.classList.add('show');
-  clearTimeout(el._t);
-  el._t = setTimeout(()=>el.classList.remove('show'), 2500);
+async function api(m, p, b) {
+  const r = await fetch(BACKEND + p, {method:m,headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});
+  const d = await r.json();
+  if (d.error) throw new Error(d.error);
+  return d;
 }
 
-function baseURL() {
-  const custom = document.getElementById('backendUrl');
-  if (custom) backendUrl = custom.value || backendUrl;
-  return backendUrl;
-}
-
-async function api(method, path, body) {
-  const url = baseURL() + path;
-  const opts = {method,headers:{'Content-Type':'application/json'}};
-  if (body) opts.body = JSON.stringify(body);
-  const r = await fetch(url, opts);
-  if (!r.ok) {
-    const txt = await r.text();
-    let msg = txt;
-    try { const j = JSON.parse(txt); msg = j.error || txt; } catch(e) {}
-    throw new Error(msg);
-  }
-  return r.json();
-}
-
-// Tab switching
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-    tab.classList.add('active');
-    document.querySelectorAll('#chat-tab,#train-tab,#extract-tab,#services-tab,#settings-tab').forEach(p=>p.style.display='none');
-    document.getElementById(tab.dataset.tab + '-tab').style.display = 'flex';
-    if (tab.dataset.tab === 'services') loadStats();
-    if (tab.dataset.tab === 'extract') loadExtractors();
-    if (tab.dataset.tab === 'train') updateTrainUI();
-  });
-});
-
-// Backend connection detection
-async function checkBackend() {
-  const el = document.getElementById('setupStatus');
+async function check() {
   const icon = document.getElementById('setupIcon');
   const msg = document.getElementById('setupMsg');
-  const steps = document.getElementById('setupSteps');
-  const buttons = document.getElementById('setupButtons');
-
-  icon.textContent = '🔍';
-  msg.textContent = 'Looking for local backend on ' + baseURL() + '...';
-
+  const actions = document.getElementById('setupActions');
   try {
-    const status = await api('GET','/api/status');
+    const s = await api('GET','/api/status');
     connected = true;
     icon.textContent = '✅';
-    msg.textContent = 'Backend connected! Your data stays on your device.';
-    steps.style.display = 'none';
-    buttons.style.display = 'none';
-    document.getElementById('setup-screen').classList.add('hidden');
-    document.getElementById('chatInputArea').style.display = 'flex';
-    document.getElementById('chatDisabledMsg').style.display = 'none';
+    msg.textContent = `Connected! ${s.messages} messages loaded.`;
+    document.getElementById('setup').classList.add('hidden');
+    document.getElementById('bar').style.display = 'flex';
     document.getElementById('connStatus').textContent = '✅ Connected';
-    document.getElementById('trainBtn').disabled = false;
-    initApp(status);
-    return true;
+    document.getElementById('tMsgs').textContent = s.messages;
+    if (s.messages > 0) messages.push({role:'info',text:`AI ready — ${s.messages} messages loaded.`});
+    else messages.push({role:'info',text:'No messages yet. Import some to get started.'});
+    render();
+    if (s.train_running) { training = true; document.getElementById('trainBtn').textContent = '⏹ Stop'; setInterval(poll, 1000); }
+    updateStats();
   } catch(e) {
     connected = false;
     icon.textContent = '🔌';
-    msg.textContent = 'Backend not found. Download and run it on your computer.';
-    steps.style.display = 'block';
-    buttons.style.display = 'flex';
-    document.getElementById('connStatus').textContent = '❌ Disconnected';
-
-    const step1 = document.getElementById('step1');
-    const step2 = document.getElementById('step2');
-    const step3 = document.getElementById('step3');
-
-    step1.classList.remove('step-done');
-    step2.classList.remove('step-done');
-    step3.classList.remove('step-done');
-
-    step2.querySelector('.step-text').innerHTML = 'Run this in your terminal:<div class="code-block" onclick="copyCode(this)">pip install flask torch psutil pandas<br>python server.py</div>';
-
-    const downloadBtn = document.getElementById('downloadBtn');
-    downloadBtn.href = baseURL() + '/download/desktop-backend.zip';
-    downloadBtn.onclick = function(e) {
-      e.preventDefault();
-      showDownloadInstructions();
-    };
-
-    document.getElementById('setup-screen').classList.remove('hidden');
-    document.getElementById('chatInputArea').style.display = 'none';
-    document.getElementById('chatDisabledMsg').style.display = 'flex';
-    document.getElementById('trainBtn').disabled = true;
-    return false;
+    msg.innerHTML = 'The app needs to run on your computer first.<br><br><b>1. Download</b><br><a class="btn btn-primary" href="https://github.com/fishesarethings/universal-chat-ai/releases/latest/download/UniversalChatAI.app.zip" style="display:inline-block;padding:10px 20px;border-radius:8px;background:#00d4aa;color:#0a0a1a;text-decoration:none;font-weight:600;font-size:15px;margin:4px 0">⬇ Download for Mac</a><br><br><b>2. Open the downloaded file</b><br><br><b>3. Allow in macOS</b><br>Right-click → Open (first time only)<br><br><b>4. Click "Start" in the Terminal window</b><br><br><b>5. Tap Refresh below</b>';
+    actions.innerHTML = '<button class="btn btn-primary" onclick="check()">🔄 Refresh</button><button class="btn btn-outline" onclick="document.getElementById(\'setup\').classList.add(\'hidden\');document.getElementById(\'bar\').style.display=\'none\'">Browse anyway</button>';
+    document.getElementById('connStatus').textContent = '❌ Not connected';
   }
 }
 
-function showDownloadInstructions() {
-  const msg = document.getElementById('setupMsg');
-  msg.innerHTML = `
-    <strong>Download the desktop backend:</strong><br><br>
-    <b>Option 1: One-line install (Mac/Linux)</b>
-    <div class="code-block" onclick="copyCode(this)">curl -L https://github.com/YOUR_USER/universal-chat-ai/releases/latest/download/setup.sh | bash</div>
-    <b>Option 2: Manual</b><br>
-    Clone the repo and run:
-    <div class="code-block" onclick="copyCode(this)">git clone https://github.com/YOUR_USER/universal-chat-ai.git<br>cd universal-chat-ai<br>pip install -r requirements.txt<br>python server.py</div>
-    <b>Option 3: Windows</b>
-    <div class="code-block" onclick="copyCode(this)">pip install flask torch psutil pandas<br>python server.py</div>
-    Then <strong>refresh this page</strong> or click Retry below.
-  `;
-}
-
-function copyCode(el) {
-  const text = el.textContent;
-  navigator.clipboard.writeText(text).then(() => toast('Copied to clipboard'));
-}
-
-function retryConnect() {
-  checkBackend();
-}
-
-function continueOffline() {
-  document.getElementById('setup-screen').classList.add('hidden');
-  document.getElementById('chatMessages').innerHTML = '<div class="msg system">Offline mode. Run the desktop backend and reconnect in Settings.</div>';
-}
-
-function reconnect() {
-  localStorage.setItem('backendUrl', document.getElementById('backendUrl').value);
-  backendUrl = document.getElementById('backendUrl').value;
-  checkBackend();
-}
-
-// Chat
-const chatInput = document.getElementById('chatInput');
-chatInput.addEventListener('keydown', e => { if (e.key==='Enter'&&!e.shiftKey) { e.preventDefault(); send(); } });
-
-function escapeHtml(t){return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
-
-function scrollChat() {
-  const el = document.getElementById('chatMessages');
-  el.scrollTop = el.scrollHeight;
+function render() {
+  document.getElementById('msgs').innerHTML = messages.map(m =>
+    `<div class="msg ${m.role==='user'?'me':m.role==='assistant'?'ai':'info'}">${m.text}</div>`
+  ).join('');
+  document.getElementById('msgs').scrollTop = document.getElementById('msgs').scrollHeight;
 }
 
 async function send() {
   if (generating || !connected) return;
-  const text = chatInput.value.trim();
+  const input = document.getElementById('input');
+  const text = input.value.trim();
   if (!text) return;
-  chatInput.value = '';
-  const btn = document.getElementById('sendBtn');
-  btn.disabled = true;
-
-  state.messages.push({role:'user',content:text});
-  renderChat();
-  scrollChat();
-
-  const temp = parseFloat(document.getElementById('temp').value);
-  const topk = parseInt(document.getElementById('topk').value);
-  const maxlen = parseInt(document.getElementById('maxlen').value);
-
+  input.value = '';
+  document.getElementById('send').disabled = true;
+  messages.push({role:'user',text}); render();
   try {
-    const resp = await api('POST', '/api/generate', {
-      prompt: text, temperature: temp, top_k: topk, max_new: maxlen,
-      history: state.messages.slice(-6).map(m=>({role:m.role,content:m.content}))
+    const r = await api('POST','/api/generate',{
+      prompt:text, temperature:parseFloat(document.getElementById('temp').value),
+      top_k:40, max_new:parseInt(document.getElementById('maxlen').value),
+      history: messages.filter(m=>m.role!=='info').slice(-6).map(m=>({role:m.role,content:m.text}))
     });
-    state.messages.push({role:'assistant',content:resp.text});
-    renderChat();
-    scrollChat();
-    api('POST','/api/add_message',{role:'assistant',text:resp.text}).catch(()=>{});
-  } catch(e) {
-    state.messages.push({role:'assistant',content:'[error: '+e.message+']'});
-    renderChat();
-    scrollChat();
-  }
-  btn.disabled = false;
-  chatInput.focus();
+    messages.push({role:'assistant',text:r.text}); render();
+    api('POST','/api/add_message',{role:'assistant',text:r.text}).catch(()=>{});
+  } catch(e) { messages.push({role:'ai',text:'[error]'}); render(); }
+  document.getElementById('send').disabled = false;
+  input.focus();
 }
+document.getElementById('input').addEventListener('keydown', e=>{if(e.key==='Enter')send()});
 
-function renderChat() {
-  const el = document.getElementById('chatMessages');
-  if (state.messages.length === 0) {
-    el.innerHTML = '<div class="msg system">Start a conversation below.</div>';
-    return;
-  }
-  el.innerHTML = state.messages.map(m =>
-    `<div class="msg ${m.role}">${escapeHtml(m.content)}</div>`
-  ).join('');
-}
-
-// Training
 async function toggleTrain() {
   if (!connected) return;
-  const btn = document.getElementById('trainBtn');
-  if (state.trainRunning) {
+  if (training) {
     await api('POST','/api/train',{action:'stop'});
-    state.trainRunning = false;
-    btn.textContent = '▶ Start Training';
-    clearInterval(trainPoll);
-    toast('Training stopped');
-    return;
-  }
-  const epochs = parseInt(document.getElementById('trainEpochs').value) || 20;
-  const resume = document.getElementById('trainResume').checked;
-  const modelSize = document.getElementById('trainModelSize').value;
-  btn.textContent = '⏳ Starting...';
-  btn.disabled = true;
-  const resp = await api('POST','/api/train',{action:'start',epochs,resume,model_size:modelSize});
-  if (resp.error) { toast('Error: '+resp.error); btn.textContent = '▶ Start Training'; btn.disabled = false; return; }
-  state.trainRunning = true;
-  btn.textContent = '⏹ Stop Training';
-  btn.disabled = false;
-  toast('Training started');
-  if (trainPoll) clearInterval(trainPoll);
-  trainPoll = setInterval(pollProgress, 1000);
-}
-
-async function pollProgress() {
-  try {
-    const resp = await api('GET','/api/progress');
-    updateTrainUI(resp);
-  } catch(e) {}
-}
-
-function updateTrainUI(data) {
-  if (!data) data = state;
-  const p = data.progress || {};
-  const running = data.running || state.trainRunning;
-  const btn = document.getElementById('trainBtn');
-  if (!running && state.trainRunning) {
-    state.trainRunning = false; btn.textContent = '▶ Start Training';
-    clearInterval(trainPoll); trainPoll = null;
-    loadStats();
-  }
-  document.getElementById('trainStatus').textContent = p.status==='training'?'🟢 Training...':p.status==='complete'?'✅ Complete':p.status==='error'?'❌ Error':'Idle';
-  document.getElementById('trainLoss').textContent = 'Loss: '+(p.loss||'--');
-  document.getElementById('statEpoch').textContent = (p.epoch||0)+'/'+(p.total_epochs||0);
-  document.getElementById('statLoss').textContent = p.best_loss||'--';
-  document.getElementById('statMsgs').textContent = p.messages_count||'--';
-  document.getElementById('statETA').textContent = p.eta||'--';
-  document.getElementById('trainFill').style.width = (p.percent||0)+'%';
-  if (p.status === 'complete') {
-    toast('Training complete! Best loss: '+p.best_loss);
-    state.trainRunning = false; btn.textContent = '▶ Start Training';
-    clearInterval(trainPoll); trainPoll = null;
-    loadStats();
-  }
-}
-
-// Extractors
-async function loadExtractors() {
-  if (!connected) return;
-  try {
-    const status = await api('GET','/api/status');
-    state.extractors = status.extractors || [];
-    renderExtractors();
-  } catch(e) {}
-}
-
-function renderExtractors() {
-  document.getElementById('extractorsContainer').innerHTML = state.extractors.map(ex =>
-    `<div class="extractor-item">
-      <div class="info">
-        <div class="name">${ex.name}</div>
-        <div class="desc">${ex.description||''}</div>
-      </div>
-      <div>
-        <span class="badge ${ex.available?'avail':''}">${ex.available?'Available':ex.platforms.join(', ')||'N/A'}</span>
-        ${ex.available && ex.has_extract ? '<button class="btn btn-primary btn-sm" onclick="runExtract(\''+ex.name+'\')" style="margin-left:6px">Extract</button>' : ''}
-      </div>
-    </div>`
-  ).join('');
-}
-
-async function runExtract(source) {
-  const btn = event.target;
-  btn.disabled = true; btn.textContent = '⏳...';
-  toast('Extracting '+source+'...');
-  try {
-    const resp = await api('POST','/api/extract',{source,sync:true});
-    if (resp.error) { toast('Error: '+resp.error); return; }
-    toast('Got '+resp.new+' new messages ('+resp.total+' total)');
-    loadStats();
-  } catch(e) { toast('Error: '+e.message); }
-  btn.disabled = false; btn.textContent = 'Extract';
-}
-
-async function runExtractAll() {
-  toast('Extracting all sources...');
-  try {
-    const resp = await api('POST','/api/extract',{source:'all',sync:true});
-    if (resp.error) { toast('Error: '+resp.error); return; }
-    toast('Got '+resp.new+' new messages ('+resp.total+' total)');
-    loadStats();
-  } catch(e) { toast('Error: '+e.message); }
-}
-
-// File import
-document.getElementById('fileDrop').addEventListener('dragover', e=>{e.preventDefault();e.currentTarget.classList.add('dragover')});
-document.getElementById('fileDrop').addEventListener('dragleave', e=>{e.currentTarget.classList.remove('dragover')});
-document.getElementById('fileDrop').addEventListener('drop', e=>{
-  e.preventDefault(); e.currentTarget.classList.remove('dragover');
-  const file = e.dataTransfer.files[0];
-  if (file) uploadFile(file);
-});
-document.getElementById('fileInput').addEventListener('change', e=>{
-  if (e.target.files[0]) uploadFile(e.target.files[0]);
-});
-
-async function uploadFile(file) {
-  const source = document.getElementById('importSource').value;
-  const fd = new FormData();
-  fd.append('file', file); fd.append('source', source);
-  toast('Importing '+file.name+'...');
-  try {
-    const r = await fetch(baseURL()+'/api/upload_import', {method:'POST',body:fd});
-    const resp = await r.json();
-    if (resp.error) { toast('Error: '+resp.error); return; }
-    document.getElementById('importResult').style.display = 'block';
-    document.getElementById('importResult').innerHTML = `✅ Imported <strong>${resp.imported}</strong> messages, <strong>${resp.new}</strong> new (${resp.total} total)`;
-    loadStats();
-  } catch(e) { toast('Error: '+e.message); }
-}
-
-async function uploadImport() { document.getElementById('fileInput').click(); }
-
-// Stats
-async function loadStats() {
-  if (!connected) return;
-  try {
-    const resp = await api('GET','/api/messages?limit=1');
-    const s = resp.stats || {};
-    document.getElementById('mTotal').textContent = s.total||0;
-    document.getElementById('mUser').textContent = s.user||0;
-    document.getElementById('mAssistant').textContent = s.assistant||0;
-    document.getElementById('mChars').textContent = (s.characters||0).toLocaleString();
-    document.getElementById('statMsgs').textContent = s.total||0;
-  } catch(e) {}
-}
-
-// Export
-async function exportData(fmt) {
-  if (!connected) return;
-  toast('Exporting...');
-  try {
-    const resp = await api('POST','/api/export',{format:fmt});
-    if (resp.ok) toast('Exported '+resp.count+' messages');
-    else toast('Error: '+resp.error);
-  } catch(e) { toast('Error: '+e.message); }
-}
-
-// Init
-async function initApp(status) {
-  state.trainRunning = status.train_running;
-  state.extractors = status.extractors || [];
-  if (status.messages > 0) {
-    state.messages.push({role:'system',content:`AI ready — ${status.messages} messages loaded. Processing on device.`});
+    training=false; document.getElementById('trainBtn').textContent='▶ Start Training';
   } else {
-    state.messages.push({role:'system',content:'No messages yet. Extract or import to start.'});
-  }
-  renderChat();
-  loadStats();
-  renderExtractors();
-  updateTrainUI(status);
-  if (status.train_running) {
-    document.getElementById('trainBtn').textContent = '⏹ Stop Training';
-    trainPoll = setInterval(pollProgress, 1000);
+    document.getElementById('trainBtn').textContent='⏳ Starting...';
+    await api('POST','/api/train',{action:'start',epochs:parseInt(document.getElementById('epochs').value),model_size:document.getElementById('modelSize').value});
+    training=true; document.getElementById('trainBtn').textContent='⏹ Stop';
+    setInterval(poll,1000);
   }
 }
 
-// Register service worker
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js').catch(()=>{});
+async function poll() {
+  try {
+    const r = await api('GET','/api/progress');
+    const p = r.progress || {};
+    document.getElementById('fill').style.width = (p.percent||0)+'%';
+    document.getElementById('tStatus').textContent = p.status==='training'?'Training...':p.status==='complete'?'✅ Complete':'Idle';
+    document.getElementById('tEpoch').textContent = (p.epoch||0)+'/'+(p.total_epochs||0);
+    document.getElementById('tLoss').textContent = p.loss||'--';
+    document.getElementById('tETA').textContent = p.eta||'--';
+    if (p.status==='complete') { training=false; document.getElementById('trainBtn').textContent='▶ Start Training'; updateStats(); }
+  } catch(e) {}
 }
 
-// Startup
-(async function() {
-  await checkBackend();
-})();
+async function updateStats() {
+  try {
+    const r = await api('GET','/api/messages?limit=1');
+    const s = r.stats||{};
+    document.getElementById('mTotal').textContent = s.total||0;
+    document.getElementById('mSent').textContent = s.assistant||0;
+    document.getElementById('mReceived').textContent = s.user||0;
+    document.getElementById('tMsgs').textContent = s.total||0;
+  } catch(e) {}
+}
+
+// Import
+document.getElementById('drop').addEventListener('dragover',e=>{e.preventDefault();e.currentTarget.classList.add('dragover')});
+document.getElementById('drop').addEventListener('dragleave',e=>{e.currentTarget.classList.remove('dragover')});
+document.getElementById('drop').addEventListener('drop',function(e){e.preventDefault();this.classList.remove('dragover');if(e.dataTransfer.files[0])upload(e.dataTransfer.files[0])});
+document.getElementById('file').addEventListener('change',function(){if(this.files[0])upload(this.files[0])});
+
+async function upload(file) {
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('source', document.getElementById('source').value);
+  try {
+    const r = await fetch(BACKEND+'/api/upload_import',{method:'POST',body:fd});
+    const resp = await r.json();
+    document.getElementById('importResult').style.display='block';
+    document.getElementById('importResult').innerHTML = resp.error ? '❌ '+resp.error : `✅ Imported ${resp.imported} messages (${resp.new} new)`;
+    updateStats();
+  } catch(e) { document.getElementById('importResult').style.display='block'; document.getElementById('importResult').innerHTML = '❌ Error importing'; }
+}
+
+// Tab switching
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  t.classList.add('active');
+  const tabs = {chat:'chat',train:'train',import:'import-tab',settings:'settings'};
+  Object.values(tabs).forEach(id=>document.getElementById(id).style.display='none');
+  document.getElementById(tabs[t.dataset.tab]).style.display='flex';
+}));
+
+function setMode(m) {
+  document.querySelectorAll('.toggle button').forEach(b=>b.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('chat').style.display=m==='chat'?'flex':'none';
+  document.getElementById('train').style.display=m==='train'?'flex':'none';
+}
+
+// Start
+check();
 </script>
 </body>
 </html>
