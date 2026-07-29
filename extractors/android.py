@@ -297,6 +297,84 @@ def _extract_sms(udid, config):
     return messages
 
 
+def _try_parse_whatsapp(cur, messages):
+    cur.execute("SELECT data, key_from_me, timestamp, key_remote_jid FROM messages WHERE data IS NOT NULL ORDER BY timestamp ASC")
+    for text, is_from_me, ts, sender in cur.fetchall():
+        try:
+            text = text.decode('utf-8') if isinstance(text, bytes) else str(text)
+        except:
+            continue
+        if not text.strip():
+            continue
+        dt = datetime.fromtimestamp(ts / 1000).isoformat() if ts else None
+        messages.append({
+            "role": "assistant" if is_from_me else "user",
+            "text": text.strip(),
+            "timestamp": dt,
+            "sender": str(sender) if sender else None,
+            "service": "WhatsApp",
+        })
+
+
+def _try_parse_signal(cur, messages):
+    cur.execute("SELECT body, type, sent_at, source FROM messages WHERE body IS NOT NULL AND body != '' ORDER BY sent_at ASC")
+    for body, msg_type, sent_at, source in cur.fetchall():
+        ts = datetime.fromtimestamp(sent_at / 1000).isoformat() if sent_at else None
+        messages.append({
+            "role": "assistant" if str(msg_type) in ('outgoing', '1') else "user",
+            "text": str(body).strip(),
+            "timestamp": ts,
+            "sender": str(source) if source else None,
+            "service": "Signal",
+        })
+
+
+def _try_decrypt_and_parse(udid, remote_path, app, db_name, tmp_dir, messages):
+    """Try to decrypt an encrypted SQLCipher database using key from device."""
+    import shutil as _sh
+    sqlcipher = _sh.which('sqlcipher')
+    if not sqlcipher:
+        print(f"    sqlcipher not installed. Try: brew install sqlcipher")
+        return
+    try:
+        if app == 'whatsapp':
+            key_file = '/data/data/com.whatsapp/files/aw_key'
+        elif app == 'signal':
+            key_file = '/data/data/org.thoughtcrime.securesms/files/backup_key'
+        else:
+            return
+        cmd = ["adb"]
+        if udid: cmd.extend(["-s", udid])
+        key_result = subprocess.run(cmd + ["shell", "su", "-c", f"cat {key_file}"], capture_output=True, text=True, timeout=10)
+        key = key_result.stdout.strip()
+        if not key:
+            print(f"    Could not read encryption key")
+            return
+        import tempfile
+        local_db = os.path.join(tmp_dir, db_name)
+        pull = ["adb"]
+        if udid: pull.extend(["-s", udid])
+        subprocess.run(pull + ["shell", "su", "-c", f"cat {remote_path}"], stdout=open(local_db,'wb'), stderr=subprocess.PIPE, timeout=30)
+        if not os.path.exists(local_db) or os.path.getsize(local_db) == 0:
+            return
+        decrypted = os.path.join(tmp_dir, "decrypted.db")
+        import subprocess as _sp
+        _sp.run([sqlcipher, local_db, f'PRAGMA key="{key}"', f'ATTACH DATABASE "{decrypted}" AS plaintext KEY ""',
+                 'SELECT sqlcipher_export("plaintext")', 'DETACH DATABASE plaintext',
+                 '.quit'], capture_output=True, timeout=30)
+        if os.path.exists(decrypted) and os.path.getsize(decrypted) > 0:
+            dconn = sqlite3.connect(f"file:{decrypted}?mode=ro", uri=True)
+            dcur = dconn.cursor()
+            if app == 'whatsapp':
+                _try_parse_whatsapp(dcur, messages)
+            elif app == 'signal':
+                _try_parse_signal(dcur, messages)
+            dconn.close()
+            os.remove(decrypted)
+    except Exception as e:
+        print(f"    Decryption failed: {e}")
+
+
 def _extract_db(udid, config, parser_type):
     messages = []
     db_path = config.get('db', '')
@@ -321,22 +399,10 @@ def _extract_db(udid, config, parser_type):
 
             if parser_type == 'whatsapp':
                 try:
-                    cur.execute("SELECT data, key_from_me, timestamp, key_remote_jid FROM messages WHERE data IS NOT NULL ORDER BY timestamp ASC")
-                    for text, is_from_me, ts, sender in cur.fetchall():
-                        try:
-                            text = text.decode('utf-8') if isinstance(text, bytes) else str(text)
-                        except:
-                            continue
-                        if not text.strip():
-                            continue
-                        dt = datetime.fromtimestamp(ts / 1000).isoformat() if ts else None
-                        messages.append({
-                            "role": "assistant" if is_from_me else "user",
-                            "text": text.strip(),
-                            "timestamp": dt,
-                            "sender": str(sender) if sender else None,
-                            "service": "WhatsApp",
-                        })
+                    _try_parse_whatsapp(cur, messages)
+                except sqlite3.DatabaseError:
+                    print(f"    WhatsApp DB encrypted, trying to decrypt...")
+                    _try_decrypt_and_parse(udid, db_path, 'whatsapp', 'msgstore.db', tmp_dir, messages)
                 except:
                     pass
 
@@ -352,6 +418,9 @@ def _extract_db(udid, config, parser_type):
                             "sender": str(source) if source else None,
                             "service": "Signal",
                         })
+                except sqlite3.DatabaseError:
+                    print(f"    Signal DB encrypted, trying to decrypt...")
+                    _try_decrypt_and_parse(udid, db_path, 'signal', 'signal.db', tmp_dir, messages)
                 except:
                     pass
 
